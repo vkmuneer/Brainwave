@@ -112,8 +112,10 @@ def login():
     if not portal_enabled():
         return render_template("portal/disabled.html"), 403
 
-    if session.get(SESSION_KEY) and current_students():
-        return redirect(url_for("portal.home"))
+    # An existing session must not short-circuit this page: a parent arriving
+    # here wants to sign in, and silently bouncing them into whoever was signed
+    # in before leaves them looking at another child's portal.
+    signed_in_as = current_students()
 
     if request.method == "POST":
         username = request.form.get("username", "").strip()
@@ -125,7 +127,7 @@ def login():
                 f"Too many failed attempts. Please wait {max(locked_for // 60, 1)} minute(s).",
                 "danger",
             )
-            return render_template("portal/login.html")
+            return render_template("portal/login.html", signed_in_as=signed_in_as)
 
         students = _students_for_phone(username)
         if students and normalize_phone(password) == normalize_phone(username):
@@ -139,7 +141,7 @@ def login():
         ).append(datetime.utcnow())
         flash("We could not find that mobile number. Please contact the academy office.", "danger")
 
-    return render_template("portal/login.html")
+    return render_template("portal/login.html", signed_in_as=signed_in_as)
 
 
 @portal_bp.route("/logout")
