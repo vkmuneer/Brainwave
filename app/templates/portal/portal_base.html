@@ -18,9 +18,31 @@
       <img src="{{ url_for('public.logo') }}" alt="{{ app_name }}">
       <span>{{ app_name }}</span>
     </a>
-    <a class="nav-link text-white" href="{{ url_for('portal.logout') }}">
-      <i class="bi bi-box-arrow-right"></i> Logout
-    </a>
+    <div class="d-flex align-items-center gap-1">
+      {# The bottom tab bar is hidden above 768px, so these are the only way to
+         move around the portal on a laptop. #}
+      <ul class="navbar-nav d-none d-md-flex flex-row me-2">
+        <li class="nav-item">
+          <a class="nav-link text-white px-2 {{ 'fw-bold text-decoration-underline' if request.endpoint == 'portal.home' }}"
+             href="{{ url_for('portal.home', student_id=student.id) }}">Home</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link text-white px-2 {{ 'fw-bold text-decoration-underline' if request.endpoint == 'portal.attendance' }}"
+             href="{{ url_for('portal.attendance', student_id=student.id) }}">Attendance</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link text-white px-2 {{ 'fw-bold text-decoration-underline' if request.endpoint and request.endpoint.startswith('portal.marks') }}"
+             href="{{ url_for('portal.marks', student_id=student.id) }}">Marks</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link text-white px-2 {{ 'fw-bold text-decoration-underline' if request.endpoint == 'portal.videos' }}"
+             href="{{ url_for('portal.videos', student_id=student.id) }}">Videos</a>
+        </li>
+      </ul>
+      <a class="nav-link text-white" href="{{ url_for('portal.logout') }}">
+        <i class="bi bi-box-arrow-right"></i> Logout
+      </a>
+    </div>
   </div>
 </nav>
 {% endif %}
