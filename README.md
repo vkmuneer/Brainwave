@@ -64,13 +64,15 @@ can even "Add to Home Screen" on a phone for an app-like icon).
   percentage and grade - complete with bar/pie charts. Downloadable as a **PDF analysis
   report**, a **PDF report card per student**, or an **Excel export** of the full marks
   grid.
-- **Brainwave Academy branding** - the app uses the academy's teal-to-blue gradient
-  colour theme throughout (`app/static/img/logo.svg` for the web UI, `app/static/img/logo.png`
-  for downloadable PDFs) and shows the logo on every page header and on every generated
-  PDF report/receipt. Replace both files with the exact official logo whenever you have
-  it (PDF generation needs a raster PNG/JPG - it can't render SVG); the color variables
-  in `style.css` (`--bw-teal`, `--bw-blue`, `--bw-dark-teal`) can be tuned to match it
-  exactly.
+- **Academy details and branding** - the academy name, tagline, address, phone and email
+  are set under **Settings** and print in the header of every PDF report, receipt and
+  report card. The **logo is uploaded from that same page** (PNG or JPG up to 2MB; SVG is
+  rejected because the PDF engine cannot draw it) and then appears on every page header,
+  on the parent-facing payment page, and on every generated PDF. It is stored in the
+  database, so a backup of `brainwave.db` captures it and a redeploy onto a fresh server
+  does not lose it - the bundled `app/static/img/logo.svg` is used until you upload one.
+  The colour variables in `style.css` (`--bw-teal`, `--bw-blue`, `--bw-dark-teal`) can be
+  tuned to match your logo exactly.
 
 ## Getting started (double-click launcher)
 
@@ -141,18 +143,82 @@ TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
 
 No code changes are needed - the app detects these and switches to automatic sending.
 
-### Deploying so it's reachable from anywhere
+### Deploying to cPanel shared hosting
 
-The repo already includes a `Procfile` (`web: gunicorn run:app`) and a `render.yaml`
-blueprint at the repo root, so it deploys to [Render](https://render.com) with almost no
-manual setup:
+Most shared-hosting plans can run this, as long as cPanel shows a **Setup Python App**
+icon under *Software*. Check the Python version dropdown there first: **3.11 or newer**
+is required (`matplotlib`, used for exam charts, needs 3.11+; `xhtml2pdf`, used for PDF
+reports, needs 3.10+). If only older versions are offered, the app won't install.
+
+1. **Setup Python App -> Create Application:**
+   - Python version: 3.11+
+   - Application root: `brainwave`
+   - Application URL: your domain (or a subdomain such as `academy.yourdomain.com`)
+   - Application startup file: `passenger_wsgi.py`
+   - Application Entry point: `application`
+
+   Keep the app root in your home folder, **not** inside `public_html` - that is what
+   stops `instance/brainwave.db` being downloadable over the web.
+
+2. **Get the code in** - cPanel **Git Version Control -> Create**, repository
+   `https://github.com/vkmuneer/Brainwave.git`, path `brainwave`. Later updates are then
+   a **Pull** in the same screen. No Git tool? Download the repo as a ZIP from GitHub and
+   extract it into `brainwave` with File Manager.
+
+3. **Install dependencies** - in Setup Python App, use **Run Pip Install** with
+   `requirements.txt` (or run `pip install -r requirements.txt` in the app's terminal,
+   after the `source .../activate` command cPanel shows at the top of the page).
+
+4. **Set environment variables** in the app's *Environment variables* section. The app
+   deliberately refuses to start without a real `SECRET_KEY`, and `.env` is gitignored so
+   it never arrives with the code:
+
+   | Name | Value |
+   | --- | --- |
+   | `SECRET_KEY` | a long random string - see below |
+   | `DEFAULT_ADMIN_PASSWORD` | the first admin password |
+
+   Generate the key with
+   `python3 -c "import secrets; print(secrets.token_urlsafe(48))"`, and do not reuse the
+   one from your own machine or commit it anywhere.
+
+5. **Restart** the app, then open your domain - you should get the login page. Log in as
+   `admin` with the password from step 4 and change it straight away.
+
+6. **Turn on HTTPS** - *SSL/TLS Status* -> run **AutoSSL** for the domain, and check for
+   the padlock. Teachers will be typing passwords over mobile networks.
+
+7. **Schedule backups** - *Cron Jobs*, once daily:
+   `/home/YOURUSER/brainwave/deploy/backup.sh` (substitute your cPanel username). If it
+   fails, the host may not provide the `sqlite3` command.
+
+Notes specific to shared hosting:
+
+- The server starts with an **empty database** - the app seeds the four classes and one
+  admin account on first run. Anything entered on your own machine stays there unless you
+  upload `instance/brainwave.db` yourself.
+- If pip fails on **`psycopg2-binary`**, that is the PostgreSQL driver and is not needed
+  here (cPanel deployments use the SQLite file); it can be removed from
+  `requirements.txt`.
+- The full dependency set installs to roughly **250MB**, most of it `matplotlib`. Check
+  your plan's disk and inode quota.
+- After every code change or `git pull`, press **Restart** in the Python App screen -
+  Passenger keeps serving the old code otherwise.
+
+### Deploying to Render
+
+A `Procfile` (`web: gunicorn run:app`) is included. Render can build the app directly,
+though you will need to create the service by hand - there is **no `render.yaml`
+blueprint** in this repo, so the one-click Blueprint flow does not apply:
 
 1. Push this repo to your own GitHub account (or use it directly if it's already there).
-2. On Render: **New +** -> **Blueprint** -> connect the repo -> pick the branch that has
-   this code -> Render detects `render.yaml` and shows one service, `brainwave-academy`.
-3. Click **Apply**. When prompted, set `DEFAULT_ADMIN_PASSWORD` (required) and leave
-   `DATABASE_URL`, `TWILIO_*` blank unless you have them.
-4. After the build finishes, Render gives you a public URL like
+2. On Render: **New +** -> **Web Service** -> connect the repo and pick the branch.
+3. Set the build command to `pip install -r requirements.txt` and the start command to
+   `gunicorn run:app`.
+4. Under *Environment*, set `SECRET_KEY` (required - the app will not start without a
+   real one) and `DEFAULT_ADMIN_PASSWORD`. Leave `DATABASE_URL` and `TWILIO_*` blank
+   unless you have them.
+5. After the build finishes, Render gives you a public URL like
    `https://brainwave-academy-xxxx.onrender.com` - that's the link to share/bookmark.
 
 **Important - data persistence:** the default setup uses a local SQLite file. On
