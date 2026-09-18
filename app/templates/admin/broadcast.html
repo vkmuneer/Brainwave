@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Broadcast Message{% endblock %}
+{% block content %}
+<h4 class="text-bw-teal mb-3"><i class="bi bi-megaphone"></i> Broadcast WhatsApp Message</h4>
+
+<div class="card bw-card" style="max-width: 640px;">
+  <div class="card-body">
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <label class="form-label">Send to</label>
+      <div class="mb-2 form-check">
+        <input class="form-check-input" type="radio" name="scope" id="scope_all" value="all" checked>
+        <label class="form-check-label" for="scope_all">
+          Everyone <span class="text-muted">({{ counts.all }} students)</span>
+        </label>
+      </div>
+
+      <div class="mb-2 form-check">
+        <input class="form-check-input" type="radio" name="scope" id="scope_class" value="class">
+        <label class="form-check-label" for="scope_class">One class</label>
+      </div>
+      <select name="class_id" class="form-select mb-3">
+        {% for c in classes %}
+        <option value="{{ c.id }}">Class {{ c.name }} ({{ counts.classes[c.id] }} students)</option>
+        {% endfor %}
+      </select>
+
+      <div class="mb-2 form-check">
+        <input class="form-check-input" type="radio" name="scope" id="scope_division" value="division">
+        <label class="form-check-label" for="scope_division">One division</label>
+      </div>
+      <select name="division_id" class="form-select mb-3">
+        {% for d in divisions %}
+        <option value="{{ d.id }}">{{ d.display_name }} ({{ counts.divisions[d.id] }} students)</option>
+        {% endfor %}
+      </select>
+
+      <hr>
+      <label class="form-label">Message</label>
+      <textarea name="message" class="form-control" rows="5" required
+                placeholder="Dear Parent, there will be no class on Friday due to a public holiday. - Brainwave Academy"></textarea>
+      <div class="form-text mb-3">
+        You can use <code>{name}</code> for the student's name, <code>{class}</code> for their
+        class and division, and <code>{pending}</code> for their pending fee amount.
+      </div>
+
+      <button type="submit" class="btn btn-bw-primary">
+        <i class="bi bi-send"></i> Prepare / Send Messages
+      </button>
+      <a href="{{ url_for('admin.messages') }}" class="btn btn-outline-secondary">Cancel</a>
+    </form>
+  </div>
+</div>
+
+<p class="text-muted small mt-3" style="max-width: 640px;">
+  If a Twilio WhatsApp sender is configured, messages go out automatically. Otherwise each
+  one becomes a one-tap "Send on WhatsApp" link on the Messages page, for the office to send
+  from their own phone.
+</p>
+{% endblock %}

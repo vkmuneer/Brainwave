@@ -944,6 +944,93 @@ def messages():
     return render_template("admin/messages.html", logs=logs, pending_count=pending_count, q=q)
 
 
+def _broadcast_recipients(scope, class_id, division_id):
+    """Active students matching the chosen audience, with a label for the UI."""
+    query = Student.query.filter_by(active=True)
+
+    if scope == "division" and division_id:
+        division = Division.query.get_or_404(division_id)
+        return query.filter_by(division_id=division.id).all(), division.display_name
+    if scope == "class" and class_id:
+        school_class = SchoolClass.query.get_or_404(class_id)
+        return query.filter_by(class_id=school_class.id).all(), f"Class {school_class.name}"
+    return query.all(), "All students"
+
+
+@admin_bp.route("/broadcast", methods=["GET", "POST"])
+@login_required
+@admin_required
+def broadcast():
+    classes = _classes_sorted()
+    divisions = Division.query.join(SchoolClass).all()
+
+    if request.method == "POST":
+        template = request.form.get("message", "").strip()
+        scope = request.form.get("scope", "all")
+        class_id = request.form.get("class_id", type=int)
+        division_id = request.form.get("division_id", type=int)
+
+        if not template:
+            flash("Please type a message to send.", "danger")
+            return redirect(url_for("admin.broadcast"))
+
+        recipients, audience = _broadcast_recipients(scope, class_id, division_id)
+        if not recipients:
+            flash("No active students match that selection.", "warning")
+            return redirect(url_for("admin.broadcast"))
+
+        sent = failed = manual = 0
+        for student in recipients:
+            message = (
+                template.replace("{name}", student.name)
+                .replace("{class}", f"{student.school_class.name}-{student.division.name}")
+                .replace("{pending}", f"{student.pending_fee:,.0f}")
+            )
+            result = send_whatsapp_message(student.parent_whatsapp, message)
+            db.session.add(
+                MessageLog(
+                    student_id=student.id,
+                    category="broadcast",
+                    message=message,
+                    phone=student.parent_whatsapp,
+                    status=result["status"],
+                    detail=result["detail"],
+                    manual_link=result["link"],
+                )
+            )
+            if result["status"] == "sent":
+                sent += 1
+            elif result["status"] == "failed":
+                failed += 1
+            else:
+                manual += 1
+
+        db.session.commit()
+
+        if manual:
+            flash(
+                f"Prepared {manual} message(s) for {audience}. Twilio is not configured, so "
+                "tap 'Send on WhatsApp' against each one below.",
+                "info",
+            )
+        if sent:
+            flash(f"Sent {sent} message(s) automatically to {audience}.", "success")
+        if failed:
+            flash(f"{failed} message(s) failed - see the details below.", "danger")
+        return redirect(url_for("admin.messages"))
+
+    counts = {
+        "all": Student.query.filter_by(active=True).count(),
+        "classes": {c.id: Student.query.filter_by(active=True, class_id=c.id).count() for c in classes},
+        "divisions": {
+            d.id: Student.query.filter_by(active=True, division_id=d.id).count() for d in divisions
+        },
+    }
+    return render_template(
+        "admin/broadcast.html", classes=classes, divisions=divisions, counts=counts
+    )
+
+
 @admin_bp.route("/messages/<int:message_id>/mark-sent", methods=["POST"])
 @login_required
 @admin_required
