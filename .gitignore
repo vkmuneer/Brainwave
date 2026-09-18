@@ -3,5 +3,6 @@ __pycache__/
 .env
 brainwave.db
 instance/
+backups/
 .venv/
 venv/
