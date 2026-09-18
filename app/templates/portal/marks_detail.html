@@ -1,0 +1,75 @@
+{% extends "portal/portal_base.html" %}
+{% block title %}{{ exam.name }} - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h6 class="text-bw-teal m-0">{{ exam.name }}</h6>
+  <a href="{{ url_for('portal.marks', student_id=student.id) }}"
+     class="btn btn-sm btn-outline-secondary">Back</a>
+</div>
+
+<div class="card bw-card mb-3">
+  <div class="card-body">
+    <div class="text-muted small mb-2">
+      {{ student.name }} &middot; {{ student.school_class.name }}-{{ student.division.name }}
+      &middot; {{ exam.exam_date.strftime('%d-%m-%Y') }}
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr><th>Subject</th><th class="text-end">Marks</th><th class="text-end">Max</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for es in exam.exam_subjects %}
+          {% set mark = result.marks_by_subject[es.id] %}
+          <tr>
+            <td>{{ es.subject.name }}</td>
+            <td class="text-end">{{ mark.marks_obtained | int if mark else '-' }}</td>
+            <td class="text-end text-muted">{{ es.max_marks | int }}</td>
+            <td class="text-end">
+              {% if mark %}
+              <span class="badge {{ 'bg-success' if mark.is_pass else 'bg-danger' }}">
+                {{ 'Pass' if mark.is_pass else 'Fail' }}
+              </span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="fw-bold">
+            <td>Total</td>
+            <td class="text-end">{{ result.total_obtained | int }}</td>
+            <td class="text-end">{{ result.total_max | int }}</td>
+            <td class="text-end">{{ result.percentage }}%</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="d-flex justify-content-between mt-3">
+      <span class="text-muted">Grade</span><b>{{ result.grade }}</b>
+    </div>
+    {% if result.rank %}
+    <div class="d-flex justify-content-between">
+      <span class="text-muted">Rank in class</span><b>{{ result.rank }}</b>
+    </div>
+    {% endif %}
+    <div class="d-flex justify-content-between">
+      <span class="text-muted">Result</span>
+      <b class="{{ 'text-success' if result.status == 'Pass' else 'text-danger' }}">
+        {{ result.status }}
+      </b>
+    </div>
+    {% if result.failed_subjects %}
+    <div class="text-danger small mt-2">
+      Not passed in: {{ result.failed_subjects | join(', ') }}
+    </div>
+    {% endif %}
+
+    <a href="{{ url_for('portal.report_card', exam_id=exam.id, student_id=student.id) }}"
+       class="btn btn-bw-primary w-100 mt-3">
+      <i class="bi bi-download"></i> Download report card (PDF)
+    </a>
+  </div>
+</div>
+{% endblock %}

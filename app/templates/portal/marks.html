@@ -1,0 +1,49 @@
+{% extends "portal/portal_base.html" %}
+{% block title %}Exam Marks - {{ app_name }}{% endblock %}
+{% block content %}
+<h6 class="text-bw-teal mb-3">Exam results - {{ student.name }}</h6>
+
+{% for row in rows %}
+<a href="{{ url_for('portal.marks_detail', exam_id=row.exam.id, student_id=student.id) }}"
+   class="text-decoration-none">
+  <div class="card bw-card mb-2">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="fw-bold text-bw-teal">{{ row.exam.name }}</div>
+          <div class="text-muted small">{{ row.exam.exam_date.strftime('%d-%m-%Y') }}</div>
+        </div>
+        <span class="badge {{ 'bg-success' if row.result.status == 'Pass' else 'bg-danger' }}">
+          {{ row.result.status }}
+        </span>
+      </div>
+      <div class="mt-2 d-flex justify-content-between small">
+        <span class="text-muted">Total</span>
+        <b>{{ row.result.total_obtained | int }} / {{ row.result.total_max | int }}
+          ({{ row.result.percentage }}%)</b>
+      </div>
+      <div class="d-flex justify-content-between small">
+        <span class="text-muted">Grade</span><b>{{ row.result.grade }}</b>
+      </div>
+      {% if row.result.rank %}
+      <div class="d-flex justify-content-between small">
+        <span class="text-muted">Rank in class</span><b>{{ row.result.rank }}</b>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</a>
+{% else %}
+<div class="card bw-card">
+  <div class="card-body text-muted">
+    No exam results have been published yet.
+  </div>
+</div>
+{% endfor %}
+
+{% if pending_count %}
+<p class="text-muted small">
+  {{ pending_count }} exam(s) are not shown because marks are still being entered.
+</p>
+{% endif %}
+{% endblock %}

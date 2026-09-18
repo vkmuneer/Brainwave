@@ -20,11 +20,14 @@ from flask import (
     request,
     session,
     abort,
+    send_file,
 )
 
-from ..models import Student, Settings, Attendance, VideoClass
+from ..models import Student, Settings, Attendance, VideoClass, Exam
 from ..utils.payment import build_pay_url
 from ..utils.whatsapp import normalize_phone
+from ..utils.exam_analysis import compute_exam_results
+from ..utils.pdf import render_pdf
 
 portal_bp = Blueprint("portal", __name__, url_prefix="/portal")
 
@@ -193,4 +196,87 @@ def videos():
         student=student,
         students=current_students(),
         videos=available,
+    )
+
+
+def _exam_for_student(exam_id, student):
+    """An exam from this student's own class, or 404 - so a guessed exam id
+    from another class cannot be opened."""
+    exam = Exam.query.get_or_404(exam_id)
+    if exam.class_id != student.class_id:
+        abort(404)
+    return exam
+
+
+def _student_result(exam, student):
+    """This student's row from the full class ranking, so the rank shown is
+    their real position rather than one computed in isolation."""
+    classmates = Student.query.filter_by(class_id=exam.class_id, active=True).all()
+    for result in compute_exam_results(exam, classmates):
+        if result["student"].id == student.id:
+            return result
+    return None
+
+
+@portal_bp.route("/marks")
+@portal_login_required
+def marks():
+    student = _selected_student()
+    exams = (
+        Exam.query.filter_by(class_id=student.class_id).order_by(Exam.exam_date.desc()).all()
+    )
+    rows = []
+    for exam in exams:
+        result = _student_result(exam, student)
+        if result and result["complete"]:
+            rows.append({"exam": exam, "result": result})
+
+    return render_template(
+        "portal/marks.html",
+        student=student,
+        students=current_students(),
+        rows=rows,
+        pending_count=len(exams) - len(rows),
+    )
+
+
+@portal_bp.route("/marks/<int:exam_id>")
+@portal_login_required
+def marks_detail(exam_id):
+    student = _selected_student()
+    exam = _exam_for_student(exam_id, student)
+    result = _student_result(exam, student)
+    if not result or not result["complete"]:
+        abort(404)
+
+    return render_template(
+        "portal/marks_detail.html",
+        student=student,
+        students=current_students(),
+        exam=exam,
+        result=result,
+    )
+
+
+@portal_bp.route("/marks/<int:exam_id>/report-card")
+@portal_login_required
+def report_card(exam_id):
+    student = _selected_student()
+    exam = _exam_for_student(exam_id, student)
+    result = _student_result(exam, student)
+    if not result or not result["complete"]:
+        abort(404)
+
+    buffer = render_pdf(
+        "pdf/report_card_pdf.html",
+        settings=Settings.get(),
+        exam=exam,
+        student=student,
+        result=result,
+    )
+    return send_file(
+        buffer,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=f"report_card_{student.admission_no}_{exam.name.replace(' ', '_')}.pdf",
     )
