@@ -22,6 +22,7 @@ from ..models import (
     Exam,
     ExamSubject,
     ExamMark,
+    PasswordResetRequest,
 )
 from ..utils.decorators import admin_required
 from ..utils.payment import build_pay_url, fee_reminder_message
@@ -373,6 +374,58 @@ def teacher_form(teacher_id=None):
     return render_template(
         "admin/teacher_form.html", teacher=teacher, classes=_classes_sorted(), subjects=_subjects_sorted()
     )
+
+
+@admin_bp.route("/password-requests")
+@login_required
+@admin_required
+def password_requests():
+    return render_template(
+        "admin/password_requests.html",
+        requests=PasswordResetRequest.query.filter_by(status="pending")
+        .order_by(PasswordResetRequest.created_at)
+        .all(),
+        handled=PasswordResetRequest.query.filter(PasswordResetRequest.status != "pending")
+        .order_by(PasswordResetRequest.handled_at.desc())
+        .limit(10)
+        .all(),
+    )
+
+
+@admin_bp.route("/password-requests/<int:request_id>/reset", methods=["POST"])
+@login_required
+@admin_required
+def password_request_reset(request_id):
+    reset_request = PasswordResetRequest.query.get_or_404(request_id)
+    new_password = request.form.get("new_password", "")
+
+    if len(new_password) < 4:
+        flash("Password must be at least 4 characters.", "danger")
+        return redirect(url_for("admin.password_requests"))
+
+    reset_request.user.set_password(new_password)
+    reset_request.status = "done"
+    reset_request.handled_at = datetime.utcnow()
+    reset_request.handled_by = current_user.name
+    db.session.commit()
+    flash(
+        f"Password reset for {reset_request.user.name}. Tell them their new password directly.",
+        "success",
+    )
+    return redirect(url_for("admin.password_requests"))
+
+
+@admin_bp.route("/password-requests/<int:request_id>/dismiss", methods=["POST"])
+@login_required
+@admin_required
+def password_request_dismiss(request_id):
+    reset_request = PasswordResetRequest.query.get_or_404(request_id)
+    reset_request.status = "dismissed"
+    reset_request.handled_at = datetime.utcnow()
+    reset_request.handled_by = current_user.name
+    db.session.commit()
+    flash("Request dismissed.", "info")
+    return redirect(url_for("admin.password_requests"))
 
 
 @admin_bp.route("/teachers/<int:teacher_id>/deactivate", methods=["POST"])

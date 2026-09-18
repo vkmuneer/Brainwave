@@ -124,6 +124,30 @@ class User(db.Model, UserMixin):
         return f"<User {self.username} ({self.role})>"
 
 
+class PasswordResetRequest(db.Model):
+    """A request, raised from the login page, for an admin to reset a password.
+
+    The record grants no authority on its own - an admin still has to set the
+    new password by hand - which is what makes it safe to create from a public,
+    unauthenticated page.
+    """
+
+    __tablename__ = "password_reset_requests"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    note = db.Column(db.String(255))
+    status = db.Column(db.String(10), default="pending", nullable=False)  # pending / done / dismissed
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    handled_at = db.Column(db.DateTime)
+    handled_by = db.Column(db.String(120))
+
+    user = db.relationship("User")
+
+    def __repr__(self):
+        return f"<PasswordResetRequest user={self.user_id} {self.status}>"
+
+
 class Teacher(db.Model):
     __tablename__ = "teachers"
 

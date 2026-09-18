@@ -47,6 +47,14 @@
         <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.classes') }}">Classes</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.masters') }}">Master Data</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.messages') }}">Messages</a></li>
+        {% if pending_reset_count %}
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('admin.password_requests') }}">
+            <i class="bi bi-key"></i> Password requests
+            <span class="badge bg-danger rounded-pill">{{ pending_reset_count }}</span>
+          </a>
+        </li>
+        {% endif %}
         {% else %}
         <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher.dashboard') }}">Dashboard</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher.attendance') }}">Attendance</a></li>

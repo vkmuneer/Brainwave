@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required, current_user
 
 from ..extensions import db
-from ..models import User
+from ..models import User, PasswordResetRequest
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -28,6 +28,34 @@ def login():
         flash("Invalid username or password.", "danger")
 
     return render_template("login.html")
+
+
+@auth_bp.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        note = request.form.get("note", "").strip()[:255]
+        user = User.query.filter_by(username=username).first()
+
+        if user is not None:
+            already_waiting = PasswordResetRequest.query.filter_by(
+                user_id=user.id, status="pending"
+            ).first()
+            if already_waiting is None:
+                db.session.add(PasswordResetRequest(user_id=user.id, note=note))
+                db.session.commit()
+
+        # Deliberately the same response whether or not the account exists:
+        # otherwise this page would confirm which usernames are valid to anyone
+        # who asked it.
+        flash(
+            "Thanks - if that account exists, the academy office has been notified "
+            "and will set a new password for you.",
+            "info",
+        )
+        return redirect(url_for("auth.login"))
+
+    return render_template("forgot_password.html")
 
 
 @auth_bp.route("/logout")

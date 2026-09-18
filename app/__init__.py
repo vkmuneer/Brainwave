@@ -1,6 +1,7 @@
 import os
 from datetime import date
 
+import click
 from flask import Flask
 
 from config import Config
@@ -43,7 +44,16 @@ def create_app(config_class=Config):
 
     @app.context_processor
     def inject_globals():
-        return {"today": date.today(), "app_name": "Brainwave Academy"}
+        pending_resets = 0
+        if current_user.is_authenticated and current_user.is_admin:
+            from .models import PasswordResetRequest
+
+            pending_resets = PasswordResetRequest.query.filter_by(status="pending").count()
+        return {
+            "today": date.today(),
+            "app_name": "Brainwave Academy",
+            "pending_reset_count": pending_resets,
+        }
 
     with app.app_context():
         db.create_all()
@@ -157,3 +167,36 @@ def register_cli(app):
         """Re-run the initial seed (safe to run multiple times)."""
         _ensure_seed_data(app)
         print("Seed data ensured.")
+
+    @app.cli.command("list-users")
+    def list_users():
+        """Show every login account, for when a username has been forgotten."""
+        from .models import User
+
+        for user in User.query.order_by(User.role, User.username):
+            state = "" if user.active else "  (deactivated)"
+            click.echo(f"{user.username:20} {user.role:8} {user.name}{state}")
+
+    @app.cli.command("reset-password")
+    @click.argument("username")
+    @click.password_option()
+    def reset_password(username, password):
+        """Reset any account's password from the terminal.
+
+        The only way back in when the admin password is lost, since there is no
+        second admin to reset it and no email address on file to send a link to.
+        Requires shell access to the machine, which is what makes it safe.
+        """
+        from .models import User
+
+        user = User.query.filter_by(username=username).first()
+        if user is None:
+            raise click.ClickException(
+                f"No account named '{username}'. Run 'flask --app run list-users' to see them."
+            )
+        if len(password) < 4:
+            raise click.ClickException("Password must be at least 4 characters.")
+
+        user.set_password(password)
+        db.session.commit()
+        click.echo(f"Password updated for '{user.username}' ({user.role}).")
