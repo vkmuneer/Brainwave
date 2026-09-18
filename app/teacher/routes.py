@@ -405,17 +405,32 @@ def _parse_target(raw):
 
 
 def _audience_options():
+    """(value, label) pairs for the publish dropdown, each labelled with how
+    many students it reaches - so picking the wrong division is obvious at the
+    point of choosing, rather than when students report seeing nothing."""
+
+    def count_in_division(division_id):
+        return Student.query.filter_by(division_id=division_id, active=True).count()
+
+    def count_in_class(class_id):
+        return Student.query.filter_by(class_id=class_id, active=True).count()
+
     options = []
     seen_classes = []
     for division in _my_divisions():
-        options.append((f"div:{division.id}", division.display_name))
+        count = count_in_division(division.id)
+        options.append((f"div:{division.id}", f"{division.display_name} ({count} students)"))
         if division.class_id not in seen_classes:
             seen_classes.append(division.class_id)
     for division in _my_divisions():
         if division.class_id in seen_classes:
             seen_classes.remove(division.class_id)
+            count = count_in_class(division.class_id)
             options.append(
-                (f"cls:{division.class_id}", f"{division.school_class.name} - all divisions")
+                (
+                    f"cls:{division.class_id}",
+                    f"{division.school_class.name} - all divisions ({count} students)",
+                )
             )
     return options
 
