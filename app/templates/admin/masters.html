@@ -18,6 +18,7 @@
           {{ s.name }}
           <form method="post" action="{{ url_for('admin.delete_subject', subject_id=s.id) }}"
                 onsubmit="return confirm('Remove subject {{ s.name }}?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x"></i></button>
           </form>
         </li>
@@ -27,6 +28,7 @@
       </ul>
       <div class="card-footer bg-white">
         <form method="post" action="{{ url_for('admin.add_subject') }}" class="row g-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="col-8"><input type="text" name="name" class="form-control" placeholder="e.g. Mathematics" required></div>
           <div class="col-4"><button class="btn btn-bw-primary w-100">Add</button></div>
         </form>
@@ -43,6 +45,7 @@
           {{ p.name }}
           <form method="post" action="{{ url_for('admin.delete_place', place_id=p.id) }}"
                 onsubmit="return confirm('Remove place {{ p.name }}?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x"></i></button>
           </form>
         </li>
@@ -52,6 +55,7 @@
       </ul>
       <div class="card-footer bg-white">
         <form method="post" action="{{ url_for('admin.add_place') }}" class="row g-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="col-8"><input type="text" name="name" class="form-control" placeholder="e.g. Omassery" required></div>
           <div class="col-4"><button class="btn btn-bw-primary w-100">Add</button></div>
         </form>
@@ -68,6 +72,7 @@
           {{ s.name }}
           <form method="post" action="{{ url_for('admin.delete_school', school_id=s.id) }}"
                 onsubmit="return confirm('Remove school {{ s.name }}?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x"></i></button>
           </form>
         </li>
@@ -77,6 +82,7 @@
       </ul>
       <div class="card-footer bg-white">
         <form method="post" action="{{ url_for('admin.add_school') }}" class="row g-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="col-8"><input type="text" name="name" class="form-control" placeholder="e.g. Govt HSS Omassery" required></div>
           <div class="col-4"><button class="btn btn-bw-primary w-100">Add</button></div>
         </form>

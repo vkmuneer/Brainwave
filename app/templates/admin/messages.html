@@ -37,6 +37,7 @@
       <div class="mt-2 d-flex gap-2">
         <a href="{{ log.manual_link }}" target="_blank" class="btn btn-sm btn-success"><i class="bi bi-whatsapp"></i> Send on WhatsApp</a>
         <form method="post" action="{{ url_for('admin.mark_message_sent', message_id=log.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button class="btn btn-sm btn-outline-secondary">Mark Sent</button>
         </form>
       </div>
@@ -69,6 +70,7 @@
             {% if log.status == 'manual' %}
             <a href="{{ log.manual_link }}" target="_blank" class="btn btn-sm btn-success"><i class="bi bi-whatsapp"></i></a>
             <form method="post" action="{{ url_for('admin.mark_message_sent', message_id=log.id) }}" class="d-inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button class="btn btn-sm btn-outline-secondary">Mark Sent</button>
             </form>
             {% endif %}

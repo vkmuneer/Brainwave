@@ -6,6 +6,7 @@
     <img src="{{ url_for('public.logo') }}" alt="Brainwave Academy" class="login-logo">
     <h5 class="text-center text-bw-teal mb-3">Sign in</h5>
     <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="mb-3">
         <label class="form-label">Username</label>
         <input type="text" name="username" class="form-control form-control-lg" autofocus required>

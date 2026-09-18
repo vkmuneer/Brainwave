@@ -23,6 +23,7 @@
 
 {% if students %}
 <form method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="division_id" value="{{ selected_division_id }}">
   <input type="hidden" name="exam_subject_id" value="{{ exam_subject.id }}">
 

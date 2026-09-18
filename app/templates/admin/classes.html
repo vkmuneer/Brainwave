@@ -10,6 +10,7 @@
       <div class="card-header bg-white fw-bold">Class {{ c.name }}</div>
       <div class="card-body">
         <form method="post" action="{{ url_for('admin.update_class_fee', class_id=c.id) }}" class="row g-2 align-items-end mb-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="col-8">
             <label class="form-label small">Base Course Fee (₹)</label>
             <input type="number" step="0.01" name="base_fee" class="form-control" value="{{ c.base_fee }}">
@@ -24,6 +25,7 @@
           {% for d in c.divisions %}
           <form method="post" action="{{ url_for('admin.delete_division', division_id=d.id) }}"
                 onsubmit="return confirm('Delete division {{ d.name }}?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button class="btn btn-sm btn-outline-secondary">
               {{ d.name }} ({{ d.students|length }}) <i class="bi bi-x"></i>
             </button>
@@ -34,6 +36,7 @@
         </div>
 
         <form method="post" action="{{ url_for('admin.add_division', class_id=c.id) }}" class="row g-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="col-8">
             <input type="text" name="name" class="form-control" placeholder="New division e.g. B" maxlength="10">
           </div>

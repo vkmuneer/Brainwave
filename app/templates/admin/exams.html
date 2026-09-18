@@ -27,6 +27,7 @@
           <a href="{{ url_for('admin.exam_report', exam_id=exam.id) }}" class="btn btn-sm btn-outline-secondary">Report</a>
           <form method="post" action="{{ url_for('admin.delete_exam', exam_id=exam.id) }}"
                 onsubmit="return confirm('Delete exam {{ exam.name }} and all its marks? This cannot be undone.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
           </form>
         </div>

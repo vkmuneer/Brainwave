@@ -19,6 +19,7 @@
 
 {% if students %}
 <form method="post" id="attendanceForm">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="division_id" value="{{ division.id }}">
   <input type="hidden" name="att_date" value="{{ att_date.isoformat() }}">
 

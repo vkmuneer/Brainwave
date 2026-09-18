@@ -5,14 +5,17 @@ import click
 from flask import Flask
 
 from config import Config
-from .extensions import db, login_manager
+from .extensions import db, csrf, login_manager
 
 
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
+    _check_secret_key(app)
+
     db.init_app(app)
+    csrf.init_app(app)
     login_manager.init_app(app)
 
     from .models import User
@@ -64,6 +67,29 @@ def create_app(config_class=Config):
     register_cli(app)
 
     return app
+
+
+def _check_secret_key(app):
+    """Refuse to serve real traffic with a SECRET_KEY that is published in the
+    repo - session cookies are signed with it, so a known key lets anyone forge
+    a login as the administrator. Allowed on localhost so development still
+    works out of the box."""
+    from config import PLACEHOLDER_SECRET_KEYS
+
+    if app.config["SECRET_KEY"] not in PLACEHOLDER_SECRET_KEYS:
+        return
+
+    if os.environ.get("FLASK_DEBUG") == "1" or os.environ.get("ALLOW_DEFAULT_SECRET_KEY") == "1":
+        app.logger.warning("[security] SECRET_KEY is a published placeholder - development only.")
+        return
+
+    raise RuntimeError(
+        "SECRET_KEY is still the example value from .env.example, which is public.\n"
+        "Set a real one before serving this to anyone:\n"
+        "    python3 -c \"import secrets; print(secrets.token_urlsafe(48))\"\n"
+        "then put it in .env (or your host's environment variables) as SECRET_KEY=...\n"
+        "To run locally with the placeholder anyway, set ALLOW_DEFAULT_SECRET_KEY=1."
+    )
 
 
 def _auto_migrate(app):

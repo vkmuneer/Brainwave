@@ -26,6 +26,7 @@
             <a href="{{ url_for('admin.exam_marks', exam_id=exam.id, exam_subject_id=es.id) }}" class="btn btn-sm btn-bw-primary">Enter Marks</a>
             <form method="post" action="{{ url_for('admin.delete_exam_subject', exam_id=exam.id, exam_subject_id=es.id) }}"
                   onsubmit="return confirm('Remove {{ es.subject.name }} from this exam? Its marks will be deleted.');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x"></i></button>
             </form>
           </div>
@@ -36,6 +37,7 @@
       </ul>
       <div class="card-footer bg-white">
         <form method="post" action="{{ url_for('admin.add_exam_subject', exam_id=exam.id) }}" class="row g-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="col-12 col-md-5">
             <select name="subject_id" class="form-select" required>
               <option value="">-- Subject --</option>

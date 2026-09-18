@@ -14,6 +14,15 @@ def _database_uri():
     return uri
 
 
+# Values shipped in .env.example / used as the local default. Session cookies
+# are signed with SECRET_KEY, so anyone who knows it can forge a login as any
+# user - and these are published in the repo.
+PLACEHOLDER_SECRET_KEYS = {
+    "dev-secret-key-change-me",
+    "change-this-to-a-long-random-string",
+}
+
+
 class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
     SQLALCHEMY_DATABASE_URI = _database_uri()
