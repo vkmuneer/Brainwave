@@ -963,8 +963,30 @@ def settings():
     settings_obj = Settings.get()
     if request.method == "POST":
         settings_obj.academy_name = request.form.get("academy_name", "").strip() or "Brainwave Academy"
+        settings_obj.tagline = request.form.get("tagline", "").strip()
+        settings_obj.address = request.form.get("address", "").strip()
+        settings_obj.phone = request.form.get("phone", "").strip()
+        settings_obj.email = request.form.get("email", "").strip()
         settings_obj.upi_id = request.form.get("upi_id", "").strip()
         settings_obj.upi_payee_name = request.form.get("upi_payee_name", "").strip()
+
+        upload = request.files.get("logo")
+        if request.form.get("remove_logo"):
+            settings_obj.logo_data = None
+            settings_obj.logo_mimetype = None
+        elif upload and upload.filename:
+            data = upload.read()
+            # PDF reports are rendered by xhtml2pdf, which cannot draw SVG, so
+            # a vector upload would leave every report without a logo.
+            if upload.mimetype not in ("image/png", "image/jpeg"):
+                flash("Logo must be a PNG or JPG image. SVG files cannot be used in PDF reports.", "danger")
+                return redirect(url_for("admin.settings"))
+            if len(data) > 2 * 1024 * 1024:
+                flash("Logo must be smaller than 2 MB.", "danger")
+                return redirect(url_for("admin.settings"))
+            settings_obj.logo_data = data
+            settings_obj.logo_mimetype = upload.mimetype
+
         db.session.commit()
         flash("Settings updated.", "success")
         return redirect(url_for("admin.settings"))

@@ -16,10 +16,14 @@ from xhtml2pdf import pisa
 _logo_data_uri_cache = None
 
 
-def logo_data_uri():
+def logo_data_uri(settings=None):
     """Base64 data URI of the academy logo, for embedding in PDF headers.
     xhtml2pdf can't resolve relative/static URLs reliably, and doesn't
     render SVG, so this reads the raster PNG once and caches the result."""
+    if settings is not None and settings.logo_data:
+        encoded = base64.b64encode(settings.logo_data).decode("ascii")
+        return f"data:{settings.logo_mimetype or 'image/png'};base64,{encoded}"
+
     global _logo_data_uri_cache
     if _logo_data_uri_cache is None:
         path = os.path.join(current_app.static_folder, "img", "logo.png")
@@ -32,7 +36,7 @@ def logo_data_uri():
 def render_pdf(template_name, **context):
     """Renders a template to a PDF file-like object (BytesIO, seeked to 0).
     Raises RuntimeError with xhtml2pdf's error log if generation fails."""
-    context.setdefault("logo_data_uri", logo_data_uri())
+    context.setdefault("logo_data_uri", logo_data_uri(context.get("settings")))
     html = render_template(template_name, **context)
     buffer = BytesIO()
     result = pisa.CreatePDF(html, dest=buffer)

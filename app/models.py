@@ -285,8 +285,29 @@ class Settings(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     academy_name = db.Column(db.String(120), default="Brainwave Academy", nullable=False)
+    tagline = db.Column(db.String(150))
+    address = db.Column(db.String(255))
+    phone = db.Column(db.String(80))
+    email = db.Column(db.String(120))
+
+    # Held in the database rather than as a file on disk so that one backup of
+    # brainwave.db captures the branding too, and so a redeploy onto a fresh
+    # filesystem does not silently lose the logo.
+    logo_data = db.Column(db.LargeBinary)
+    logo_mimetype = db.Column(db.String(40))
+
     upi_id = db.Column(db.String(120))
     upi_payee_name = db.Column(db.String(120))
+
+    @property
+    def contact_line(self):
+        """Phone and email joined for a single line under the address."""
+        parts = []
+        if self.phone:
+            parts.append(f"Phone: {self.phone}")
+        if self.email:
+            parts.append(self.email)
+        return "  |  ".join(parts)
 
     @classmethod
     def get(cls):

@@ -5,11 +5,66 @@
 
 <div class="card bw-card" style="max-width: 560px;">
   <div class="card-body">
-    <form method="post">
+    <form method="post" enctype="multipart/form-data">
+      <h6 class="text-bw-teal">Academy Details</h6>
+      <p class="text-muted small">These appear in the header of every PDF report and receipt.</p>
       <div class="mb-3">
         <label class="form-label">Academy Name</label>
         <input type="text" name="academy_name" class="form-control" value="{{ settings.academy_name }}">
       </div>
+      <div class="mb-3">
+        <label class="form-label">Tagline <span class="text-muted">(optional)</span></label>
+        <input type="text" name="tagline" class="form-control" maxlength="150"
+               placeholder="Excellence in learning" value="{{ settings.tagline or '' }}">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Address</label>
+        <input type="text" name="address" class="form-control" maxlength="255"
+               placeholder="Mukkam Road, Omassery, Kozhikode - 673582"
+               value="{{ settings.address or '' }}">
+      </div>
+      <div class="row">
+        <div class="col-12 col-sm-6 mb-3">
+          <label class="form-label">Phone</label>
+          <input type="text" name="phone" class="form-control" maxlength="80"
+                 placeholder="+91 98470 00000" value="{{ settings.phone or '' }}">
+        </div>
+        <div class="col-12 col-sm-6 mb-3">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-control" maxlength="120"
+                 placeholder="office@brainwave.in" value="{{ settings.email or '' }}">
+        </div>
+      </div>
+
+      <hr>
+      <h6 class="text-bw-teal">Logo</h6>
+      <div class="d-flex align-items-center gap-3 mb-2">
+        <img src="{{ url_for('public.logo') }}" alt="Current logo"
+             style="width: 64px; height: 64px; object-fit: contain;">
+        <div class="small text-muted">
+          {% if settings.logo_data %}
+            Your uploaded logo.
+          {% else %}
+            The built-in logo is being used.
+          {% endif %}
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Upload a new logo</label>
+        <input type="file" name="logo" class="form-control" accept="image/png,image/jpeg">
+        <div class="form-text">
+          PNG or JPG, up to 2 MB. A square image around 300x300 works best.
+          PDF reports cannot render SVG files, so those are not accepted.
+        </div>
+      </div>
+      {% if settings.logo_data %}
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" name="remove_logo" id="remove_logo" value="1">
+        <label class="form-check-label small" for="remove_logo">
+          Remove my logo and go back to the built-in one
+        </label>
+      </div>
+      {% endif %}
       <hr>
       <h6 class="text-bw-teal">Fee Payment Link (GPay / UPI)</h6>
       <p class="text-muted small">
