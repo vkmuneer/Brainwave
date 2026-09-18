@@ -67,6 +67,17 @@ body {
   .bw-navbar .navbar-brand-wrap span {
     font-size: 1rem;
   }
+  /* Let the main menu wrap onto a second line rather than push the account
+     menu (and its Logout) off the right edge. */
+  .bw-navbar .navbar-nav.me-auto {
+    flex-wrap: wrap;
+  }
+  .bw-navbar .bw-account-nav {
+    flex-shrink: 0;
+  }
+  .bw-navbar form.d-flex input[type="search"] {
+    min-width: 130px !important;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
