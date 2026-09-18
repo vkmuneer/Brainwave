@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Video Classes{% endblock %}
+{% block content %}
+<h4 class="text-bw-teal mb-3"><i class="bi bi-play-btn"></i> Video Classes</h4>
+<p class="text-muted small">
+  Everything teachers have published. Students see these in the portal once they log in -
+  only the videos for their own class.
+</p>
+
+<div class="table-responsive">
+  <table class="table align-middle">
+    <thead>
+      <tr><th>Title</th><th>Visible to</th><th>Subject</th><th>Teacher</th><th>Added</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for v in videos %}
+      <tr>
+        <td>
+          <a href="{{ v.url }}" target="_blank" rel="noopener">{{ v.title }}</a>
+          {% if not v.published %}<span class="badge bg-secondary ms-1">Hidden</span>{% endif %}
+          {% if v.description %}<div class="text-muted small">{{ v.description }}</div>{% endif %}
+        </td>
+        <td class="small">{{ v.audience }}</td>
+        <td class="small">{{ v.subject.name if v.subject else '-' }}</td>
+        <td class="small">{{ v.uploaded_by_name or '-' }}</td>
+        <td class="small">{{ v.created_at.strftime('%d-%m-%Y') }}</td>
+        <td>
+          <form method="post" action="{{ url_for('admin.video_delete', video_id=v.id) }}"
+                onsubmit="return confirm('Remove this video?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="text-muted">No videos published yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

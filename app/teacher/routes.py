@@ -4,7 +4,17 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 
 from ..extensions import db
-from ..models import Division, Student, Attendance, MessageLog, Exam, ExamSubject, ExamMark, Settings
+from ..models import (
+    Division,
+    Student,
+    Attendance,
+    MessageLog,
+    Exam,
+    ExamSubject,
+    ExamMark,
+    Settings,
+    VideoClass,
+)
 from ..utils.decorators import teacher_required
 from ..utils.whatsapp import send_whatsapp_message, absence_message
 from ..utils.pdf import render_pdf
@@ -372,3 +382,126 @@ def exam_report_card_pdf(exam_id, student_id):
         student=student,
         result=result,
     )
+
+
+# ------------------------------------------------------------- video classes
+def _parse_target(raw):
+    """Turn the audience dropdown value into (class_id, division_id).
+
+    Accepts "div:<id>" for a single division or "cls:<id>" for every division
+    of a class, and refuses anything the teacher is not assigned to.
+    """
+    kind, _, raw_id = (raw or "").partition(":")
+    target_id = int(raw_id) if raw_id.isdigit() else 0
+
+    if kind == "div":
+        division = _get_authorized_division(target_id)
+        return division.class_id, division.id
+    if kind == "cls":
+        if target_id not in {d.class_id for d in current_user.teacher.divisions}:
+            abort(403)
+        return target_id, None
+    abort(400)
+
+
+def _audience_options():
+    options = []
+    seen_classes = []
+    for division in _my_divisions():
+        options.append((f"div:{division.id}", division.display_name))
+        if division.class_id not in seen_classes:
+            seen_classes.append(division.class_id)
+    for division in _my_divisions():
+        if division.class_id in seen_classes:
+            seen_classes.remove(division.class_id)
+            options.append(
+                (f"cls:{division.class_id}", f"{division.school_class.name} - all divisions")
+            )
+    return options
+
+
+@teacher_bp.route("/videos")
+@login_required
+@teacher_required
+def videos():
+    mine = (
+        VideoClass.query.filter_by(uploaded_by_id=current_user.id)
+        .order_by(VideoClass.created_at.desc())
+        .all()
+    )
+    return render_template(
+        "teacher/videos.html",
+        videos=mine,
+        options=_audience_options(),
+        subjects=current_user.teacher.subjects,
+    )
+
+
+@teacher_bp.route("/videos/add", methods=["POST"])
+@login_required
+@teacher_required
+def video_add():
+    title = request.form.get("title", "").strip()
+    url = request.form.get("url", "").strip()
+    description = request.form.get("description", "").strip()
+    subject_id = request.form.get("subject_id", type=int)
+
+    if not title or not url:
+        flash("A title and a video link are both required.", "danger")
+        return redirect(url_for("teacher.videos"))
+
+    # The link is rendered as an href for students, so anything other than a
+    # real web address (javascript:, data:) must not get through.
+    if not url.lower().startswith(("http://", "https://")):
+        flash("The video link must start with http:// or https://", "danger")
+        return redirect(url_for("teacher.videos"))
+
+    class_id, division_id = _parse_target(request.form.get("target"))
+
+    if subject_id and subject_id not in {s.id for s in current_user.teacher.subjects}:
+        abort(403)
+
+    db.session.add(
+        VideoClass(
+            title=title,
+            description=description,
+            url=url,
+            class_id=class_id,
+            division_id=division_id,
+            subject_id=subject_id or None,
+            uploaded_by_id=current_user.id,
+            uploaded_by_name=current_user.name,
+        )
+    )
+    db.session.commit()
+    flash(f'"{title}" is now visible to those students.', "success")
+    return redirect(url_for("teacher.videos"))
+
+
+@teacher_bp.route("/videos/<int:video_id>/toggle", methods=["POST"])
+@login_required
+@teacher_required
+def video_toggle(video_id):
+    video = VideoClass.query.get_or_404(video_id)
+    if video.uploaded_by_id != current_user.id:
+        abort(403)
+    video.published = not video.published
+    db.session.commit()
+    flash(
+        f'"{video.title}" is now {"visible to" if video.published else "hidden from"} students.',
+        "info",
+    )
+    return redirect(url_for("teacher.videos"))
+
+
+@teacher_bp.route("/videos/<int:video_id>/delete", methods=["POST"])
+@login_required
+@teacher_required
+def video_delete(video_id):
+    video = VideoClass.query.get_or_404(video_id)
+    if video.uploaded_by_id != current_user.id:
+        abort(403)
+    db.session.delete(video)
+    db.session.commit()
+    flash("Video removed.", "info")
+    return redirect(url_for("teacher.videos"))

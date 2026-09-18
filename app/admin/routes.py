@@ -23,6 +23,7 @@ from ..models import (
     ExamSubject,
     ExamMark,
     PasswordResetRequest,
+    VideoClass,
 )
 from ..utils.decorators import admin_required
 from ..utils.payment import build_pay_url, fee_reminder_message
@@ -942,6 +943,27 @@ def messages():
     logs = query.limit(200).all()
     pending_count = MessageLog.query.filter_by(status="manual").count()
     return render_template("admin/messages.html", logs=logs, pending_count=pending_count, q=q)
+
+
+@admin_bp.route("/videos")
+@login_required
+@admin_required
+def videos():
+    return render_template(
+        "admin/videos.html",
+        videos=VideoClass.query.order_by(VideoClass.created_at.desc()).all(),
+    )
+
+
+@admin_bp.route("/videos/<int:video_id>/delete", methods=["POST"])
+@login_required
+@admin_required
+def video_delete(video_id):
+    video = VideoClass.query.get_or_404(video_id)
+    db.session.delete(video)
+    db.session.commit()
+    flash(f'"{video.title}" removed.', "info")
+    return redirect(url_for("admin.videos"))
 
 
 def _broadcast_recipients(scope, class_id, division_id):
