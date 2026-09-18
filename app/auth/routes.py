@@ -5,7 +5,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required, current_user
 
 from ..extensions import db
-from ..models import User, PasswordResetRequest
+from ..models import User, PasswordResetRequest, Settings
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -38,6 +38,11 @@ def _seconds_locked_out(username):
     return int((recent[-1] + ATTEMPT_WINDOW - datetime.utcnow()).total_seconds())
 
 
+def _portal_enabled():
+    settings = Settings.query.get(1)
+    return bool(settings and settings.student_login_enabled)
+
+
 def _is_safe_next(target):
     """Only allow redirects back into this site, so a crafted ?next= cannot
     bounce someone to another domain straight after they log in."""
@@ -63,7 +68,7 @@ def login():
                 "minute(s) and try again.",
                 "danger",
             )
-            return render_template("login.html")
+            return render_template("login.html", portal_enabled=_portal_enabled())
 
         user = User.query.filter_by(username=username).first()
 
@@ -79,7 +84,7 @@ def login():
         _failed_attempts.setdefault(_attempt_key(username), []).append(datetime.utcnow())
         flash("Invalid username or password.", "danger")
 
-    return render_template("login.html")
+    return render_template("login.html", portal_enabled=_portal_enabled())
 
 
 @auth_bp.route("/forgot-password", methods=["GET", "POST"])

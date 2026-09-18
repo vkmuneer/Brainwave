@@ -20,6 +20,17 @@
     <div class="text-center mt-3">
       <a href="{{ url_for('auth.forgot_password') }}" class="text-bw-teal">Forgot password?</a>
     </div>
+
+    {% if portal_enabled %}
+    <hr class="my-4">
+    <p class="text-center text-muted small mb-2">Are you a student or parent?</p>
+    <a href="{{ url_for('portal.login') }}" class="btn btn-outline-secondary w-100">
+      <i class="bi bi-people"></i> Student / Parent Login
+    </a>
+    <p class="text-center text-muted small mt-2 mb-0">
+      Sign in with your WhatsApp number.
+    </p>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
