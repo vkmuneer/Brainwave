@@ -28,11 +28,13 @@ def create_app(config_class=Config):
     from .admin.routes import admin_bp
     from .teacher.routes import teacher_bp
     from .public.routes import public_bp
+    from .portal.routes import portal_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(teacher_bp)
     app.register_blueprint(public_bp)
+    app.register_blueprint(portal_bp)
 
     from flask import redirect, url_for
     from flask_login import current_user

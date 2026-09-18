@@ -1,0 +1,31 @@
+{% extends "portal/portal_base.html" %}
+{% block title %}Video Classes - {{ app_name }}{% endblock %}
+{% block content %}
+<h6 class="text-bw-teal mb-3">
+  Video classes - {{ student.school_class.name }}-{{ student.division.name }}
+</h6>
+
+{% for v in videos %}
+<div class="card bw-card mb-2">
+  <div class="card-body">
+    <div class="fw-bold">{{ v.title }}</div>
+    <div class="text-muted small mb-2">
+      {% if v.subject %}{{ v.subject.name }} &middot; {% endif %}
+      {{ v.uploaded_by_name or 'Teacher' }} &middot; {{ v.created_at.strftime('%d-%m-%Y') }}
+    </div>
+    {% if v.description %}<p class="small mb-2">{{ v.description }}</p>{% endif %}
+    {% if v.url %}
+    <a href="{{ v.url }}" target="_blank" rel="noopener" class="btn btn-sm btn-bw-primary">
+      <i class="bi bi-play-btn"></i> Watch
+    </a>
+    {% endif %}
+  </div>
+</div>
+{% else %}
+<div class="card bw-card">
+  <div class="card-body text-muted">
+    No video classes have been published for your class yet.
+  </div>
+</div>
+{% endfor %}
+{% endblock %}

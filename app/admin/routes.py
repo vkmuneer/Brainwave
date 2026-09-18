@@ -969,6 +969,7 @@ def settings():
         settings_obj.email = request.form.get("email", "").strip()
         settings_obj.upi_id = request.form.get("upi_id", "").strip()
         settings_obj.upi_payee_name = request.form.get("upi_payee_name", "").strip()
+        settings_obj.student_login_enabled = bool(request.form.get("student_login_enabled"))
 
         upload = request.files.get("logo")
         if request.form.get("remove_logo"):

@@ -299,6 +299,11 @@ class Settings(db.Model):
     upi_id = db.Column(db.String(120))
     upi_payee_name = db.Column(db.String(120))
 
+    # Off by default: the portal signs parents in with their own phone number as
+    # both username and password, so it should only be reachable once the
+    # academy has decided to switch it on.
+    student_login_enabled = db.Column(db.Boolean, default=False, nullable=False)
+
     @property
     def contact_line(self):
         """Phone and email joined for a single line under the address."""
@@ -320,6 +325,52 @@ class Settings(db.Model):
 
     def __repr__(self):
         return f"<Settings {self.academy_name}>"
+
+
+class VideoClass(db.Model):
+    """A recorded class a teacher publishes to one class (or one division).
+
+    Only the link is stored for now - hosting video files on shared hosting
+    would exhaust the disk quota - but `file_path` is reserved so uploads can
+    be added later without a second model.
+    """
+
+    __tablename__ = "video_classes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(150), nullable=False)
+    description = db.Column(db.String(500))
+
+    class_id = db.Column(db.Integer, db.ForeignKey("school_classes.id"), nullable=False)
+    # NULL means "every division of this class".
+    division_id = db.Column(db.Integer, db.ForeignKey("divisions.id"), nullable=True)
+    subject_id = db.Column(db.Integer, db.ForeignKey("subjects.id"), nullable=True)
+
+    url = db.Column(db.String(500))
+    file_path = db.Column(db.String(300))
+
+    uploaded_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    uploaded_by_name = db.Column(db.String(120))
+    published = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    school_class = db.relationship("SchoolClass")
+    division = db.relationship("Division")
+    subject = db.relationship("Subject")
+
+    @property
+    def audience(self):
+        if self.division:
+            return self.division.display_name
+        return f"{self.school_class.name} (all divisions)"
+
+    def visible_to(self, student):
+        if not self.published or student.class_id != self.class_id:
+            return False
+        return self.division_id is None or self.division_id == student.division_id
+
+    def __repr__(self):
+        return f"<VideoClass {self.title}>"
 
 
 GRADE_BANDS = [

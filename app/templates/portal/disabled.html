@@ -1,0 +1,13 @@
+{% extends "portal/portal_base.html" %}
+{% block title %}Student Portal{% endblock %}
+{% block content %}
+<div class="card bw-card login-card mt-4">
+  <div class="card-body p-4 text-center">
+    <img src="{{ url_for('public.logo') }}" alt="{{ app_name }}" class="login-logo">
+    <h5 class="text-bw-teal mb-2">Student portal is closed</h5>
+    <p class="text-muted small mb-0">
+      The academy has not enabled student and parent logins. Please contact the office.
+    </p>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "portal/portal_base.html" %}
+{% block title %}Student Login - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="card bw-card login-card mt-4">
+  <div class="card-body p-4">
+    <img src="{{ url_for('public.logo') }}" alt="{{ app_name }}" class="login-logo">
+    <h5 class="text-center text-bw-teal mb-1">Student / Parent Login</h5>
+    <p class="text-muted small text-center mb-4">
+      Use the mobile number you gave the academy, as both the username and the password.
+    </p>
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-3">
+        <label class="form-label">Mobile number</label>
+        <input type="tel" name="username" class="form-control form-control-lg"
+               inputmode="numeric" autocomplete="username" autofocus required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Password (the same mobile number)</label>
+        <input type="password" name="password" class="form-control form-control-lg"
+               inputmode="numeric" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn btn-bw-primary btn-lg w-100">Login</button>
+    </form>
+    <p class="text-muted small text-center mt-3 mb-0">
+      Trouble signing in? Contact the academy office to check the number on your record.
+    </p>
+  </div>
+</div>
+{% endblock %}

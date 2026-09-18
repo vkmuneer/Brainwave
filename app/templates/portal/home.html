@@ -1,0 +1,62 @@
+{% extends "portal/portal_base.html" %}
+{% block title %}{{ student.name }} - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="card bw-card mb-3">
+  <div class="card-body">
+    <h5 class="text-bw-teal mb-1">{{ student.name }}</h5>
+    <div class="text-muted small">
+      {{ student.admission_no }} &middot; Class {{ student.school_class.name }}-{{ student.division.name }}
+    </div>
+  </div>
+</div>
+
+<div class="card bw-card mb-3">
+  <div class="card-body">
+    <h6 class="text-bw-teal">Fees</h6>
+    <div class="d-flex justify-content-between"><span class="text-muted">Total fee</span>
+      <b>Rs. {{ '{:,.0f}'.format(student.total_fee) }}</b></div>
+    {% if student.discount_amount %}
+    <div class="d-flex justify-content-between"><span class="text-muted">Discount</span>
+      <span>Rs. {{ '{:,.0f}'.format(student.discount_amount) }}</span></div>
+    {% endif %}
+    <div class="d-flex justify-content-between"><span class="text-muted">Paid</span>
+      <span class="text-success">Rs. {{ '{:,.0f}'.format(student.total_paid) }}</span></div>
+    <hr class="my-2">
+    <div class="d-flex justify-content-between">
+      <span class="fw-bold">Pending</span>
+      <span class="fw-bold {{ 'text-danger' if student.pending_fee > 0 else 'text-success' }}">
+        Rs. {{ '{:,.0f}'.format(student.pending_fee) }}
+      </span>
+    </div>
+
+    {% if pay_url %}
+    <a href="{{ pay_url }}" class="btn btn-bw-primary w-100 mt-3">
+      <i class="bi bi-phone"></i> Pay via GPay / UPI
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+{% if student.payments %}
+<div class="card bw-card mb-3">
+  <div class="card-body">
+    <h6 class="text-bw-teal">Payment history</h6>
+    <div class="table-responsive">
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Date</th><th>Receipt</th><th>Mode</th><th class="text-end">Amount</th></tr></thead>
+        <tbody>
+          {% for p in student.payments | reverse %}
+          <tr>
+            <td class="small">{{ p.payment_date.strftime('%d-%m-%Y') }}</td>
+            <td class="small">{{ p.receipt_no or '-' }}</td>
+            <td class="small">{{ p.mode }}</td>
+            <td class="text-end">Rs. {{ '{:,.0f}'.format(p.amount) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
