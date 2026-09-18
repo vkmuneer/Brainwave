@@ -34,11 +34,16 @@ if [ ! -f ".env" ]; then
     echo ""
 fi
 
+PORT="$(sed -n 's/^PORT=\([0-9]*\).*/\1/p' .env 2>/dev/null | tail -1)"
+PORT="${PORT:-5000}"
+URL="http://localhost:$PORT"
+
 echo ""
 echo "Starting the server... your browser should open automatically."
+echo "If it doesn't, go to $URL"
 echo "Keep this window open while you use the app. Press Ctrl+C to stop the server."
 echo ""
 
-( sleep 2 && (open http://localhost:5000 2>/dev/null || xdg-open http://localhost:5000 2>/dev/null || true) ) &
+( sleep 2 && (open "$URL" 2>/dev/null || xdg-open "$URL" 2>/dev/null || true) ) &
 
 python run.py
