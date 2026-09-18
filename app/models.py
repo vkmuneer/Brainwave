@@ -1,4 +1,6 @@
+import re
 from datetime import date, datetime
+from urllib.parse import urlparse, parse_qs
 
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -327,6 +329,10 @@ class Settings(db.Model):
         return f"<Settings {self.academy_name}>"
 
 
+_YOUTUBE_ID = re.compile(r"^[A-Za-z0-9_-]{6,20}$")
+_DRIVE_ID = re.compile(r"^[A-Za-z0-9_-]{10,80}$")
+
+
 class VideoClass(db.Model):
     """A recorded class a teacher publishes to one class (or one division).
 
@@ -363,6 +369,43 @@ class VideoClass(db.Model):
         if self.division:
             return self.division.display_name
         return f"{self.school_class.name} (all divisions)"
+
+    @property
+    def embed_url(self):
+        """A player URL to put in an iframe, or None to fall back to a link.
+
+        Built from an id extracted from a recognised host - never from the
+        pasted URL directly, since anything dropped straight into an iframe src
+        would be a way to render arbitrary content inside the portal.
+        """
+        if not self.url:
+            return None
+
+        parsed = urlparse(self.url)
+        host = (parsed.netloc or "").lower()
+        host = host[4:] if host.startswith("www.") else host
+        video_id = ""
+
+        if host == "youtu.be":
+            video_id = parsed.path.lstrip("/").split("/")[0]
+        elif host in ("youtube.com", "m.youtube.com", "youtube-nocookie.com"):
+            if parsed.path == "/watch":
+                video_id = parse_qs(parsed.query).get("v", [""])[0]
+            elif parsed.path.startswith(("/embed/", "/shorts/", "/live/")):
+                parts = parsed.path.split("/")
+                video_id = parts[2] if len(parts) > 2 else ""
+        elif host == "drive.google.com":
+            parts = parsed.path.split("/")
+            if len(parts) > 4 and parts[1] == "file" and parts[2] == "d":
+                if _DRIVE_ID.match(parts[3]):
+                    return f"https://drive.google.com/file/d/{parts[3]}/preview"
+            return None
+
+        if _YOUTUBE_ID.match(video_id):
+            # nocookie host so watching a class video does not leave ad-tracking
+            # cookies on a student's phone.
+            return f"https://www.youtube-nocookie.com/embed/{video_id}"
+        return None
 
     def visible_to(self, student):
         if not self.published or student.class_id != self.class_id:

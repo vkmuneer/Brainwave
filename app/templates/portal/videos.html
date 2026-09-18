@@ -14,7 +14,14 @@
       {{ v.uploaded_by_name or 'Teacher' }} &middot; {{ v.created_at.strftime('%d-%m-%Y') }}
     </div>
     {% if v.description %}<p class="small mb-2">{{ v.description }}</p>{% endif %}
-    {% if v.url %}
+
+    {% if v.embed_url %}
+    <div class="ratio ratio-16x9 rounded overflow-hidden mb-2">
+      <iframe src="{{ v.embed_url }}" title="{{ v.title }}" loading="lazy"
+              allow="accelerometer; encrypted-media; gyroscope; picture-in-picture"
+              allowfullscreen></iframe>
+    </div>
+    {% elif v.url %}
     <a href="{{ v.url }}" target="_blank" rel="noopener" class="btn btn-sm btn-bw-primary">
       <i class="bi bi-play-btn"></i> Watch
     </a>
