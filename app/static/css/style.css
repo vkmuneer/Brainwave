@@ -37,6 +37,48 @@ body {
   text-decoration: underline;
 }
 
+/* Icon and label share a baseline instead of each item sitting at its own
+   height, which is what makes a row of mixed icon/text links look ragged. */
+.bw-navbar .navbar-nav .nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 8px;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.bw-navbar .navbar-nav .nav-link:hover,
+.bw-navbar .navbar-nav .nav-link:focus-visible {
+  background-color: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+@media (min-width: 768px) {
+  .bw-navbar .navbar-nav {
+    align-items: center;
+  }
+  /* Smaller only once the menu is a horizontal row - the collapsed mobile
+     menu keeps full-size text for touch. */
+  .bw-navbar .navbar-nav .nav-link {
+    font-size: 0.8125rem;
+    padding: 0.4rem 0.55rem;
+    white-space: nowrap;
+  }
+  .bw-navbar .navbar-brand-wrap span {
+    font-size: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bw-navbar .navbar-nav .nav-link {
+    transition: none;
+  }
+  .bw-navbar .navbar-nav .nav-link:hover,
+  .bw-navbar .navbar-nav .nav-link:focus-visible {
+    transform: none;
+  }
+}
+
 .bw-card {
   border: none;
   border-radius: 14px;
