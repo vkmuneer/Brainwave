@@ -67,6 +67,35 @@
       </div>
       {% endif %}
       <hr>
+      <h6 class="text-bw-teal">WhatsApp sending</h6>
+      {% if whatsapp.configured %}
+      <p class="small mb-2">
+        <span class="badge bg-success">Connected</span>
+        Sending automatically from <code>{{ whatsapp.from_number }}</code>.
+      </p>
+        {% if whatsapp.sandbox %}
+        <div class="alert alert-warning small">
+          This is Twilio's <b>test sandbox</b>. It only delivers to phones that have sent
+          the join code to that number first, so it is for checking the setup - not for
+          messaging parents. A live number needs a WhatsApp Business account and
+          Meta-approved message templates.
+        </div>
+        {% endif %}
+      {% else %}
+      <p class="small mb-2">
+        <span class="badge bg-secondary">Not connected</span>
+        Messages become one-tap "Send on WhatsApp" links for the office to send by hand.
+      </p>
+      <div class="alert alert-light border small">
+        To send automatically, put your Twilio credentials in the <code>.env</code> file
+        beside <code>run.py</code> and restart:
+        <pre class="mb-0 mt-2 small">TWILIO_ACCOUNT_SID=ACxxxxxxxx
+TWILIO_AUTH_TOKEN=xxxxxxxx
+TWILIO_WHATSAPP_FROM=whatsapp:+14155238886</pre>
+      </div>
+      {% endif %}
+
+      <hr>
       <h6 class="text-bw-teal">Attendance</h6>
       <div class="mb-3">
         <label class="form-label">How often is attendance taken?</label>
@@ -130,6 +159,28 @@
         <input type="text" name="upi_payee_name" class="form-control" placeholder="Brainwave Academy" value="{{ settings.upi_payee_name or '' }}">
       </div>
       <button type="submit" class="btn btn-bw-primary">Save Settings</button>
+    </form>
+  </div>
+</div>
+
+<div class="card bw-card mt-3" style="max-width: 560px;">
+  <div class="card-body">
+    <h6 class="text-bw-teal">Send a test message</h6>
+    <p class="text-muted small">
+      Sends one WhatsApp message to a number you choose, so you can check the connection
+      without any parent receiving a test.
+      {% if whatsapp.sandbox %}
+      That phone must have sent the sandbox join code to
+      <code>{{ whatsapp.from_number }}</code> first, or Twilio will refuse it.
+      {% endif %}
+    </p>
+    <form method="post" action="{{ url_for('admin.settings_test_whatsapp') }}" class="d-flex gap-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="tel" name="phone" class="form-control" inputmode="numeric"
+             placeholder="Your own mobile number" required>
+      <button class="btn btn-outline-secondary text-nowrap">
+        <i class="bi bi-whatsapp"></i> Send test
+      </button>
     </form>
   </div>
 </div>

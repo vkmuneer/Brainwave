@@ -2,7 +2,17 @@ import calendar
 from datetime import date, datetime, timedelta
 from io import BytesIO
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request, send_file, abort
+from flask import (
+    Blueprint,
+    render_template,
+    redirect,
+    url_for,
+    flash,
+    request,
+    send_file,
+    abort,
+    current_app,
+)
 from flask_login import login_required, current_user
 from sqlalchemy import func
 
@@ -1229,6 +1239,39 @@ def student_progress_report(student_id):
     )
 
 
+@admin_bp.route("/settings/test-whatsapp", methods=["POST"])
+@login_required
+@admin_required
+def settings_test_whatsapp():
+    """Send one message to a number the admin types, to prove the connection.
+
+    Deliberately not to a parent: the point is to check credentials without
+    anyone's family receiving a test message.
+    """
+    phone = request.form.get("phone", "").strip()
+    if not phone:
+        flash("Enter a mobile number to send the test to.", "danger")
+        return redirect(url_for("admin.settings"))
+
+    result = send_whatsapp_message(
+        phone,
+        f"Test message from {Settings.get().academy_name}. "
+        "If you are reading this, WhatsApp sending is working.",
+    )
+
+    if result["status"] == "sent":
+        flash(f"Test message sent to {phone}. Check that phone.", "success")
+    elif result["status"] == "failed":
+        flash(f"Twilio rejected it: {result['detail']}", "danger")
+    else:
+        flash(
+            "Twilio is not configured, so nothing was sent automatically. "
+            "Use this link to send it by hand: " + result["link"],
+            "info",
+        )
+    return redirect(url_for("admin.settings"))
+
+
 @admin_bp.route("/audit-log")
 @login_required
 @admin_required
@@ -1590,7 +1633,19 @@ def settings():
         db.session.commit()
         flash("Settings updated.", "success")
         return redirect(url_for("admin.settings"))
-    return render_template("admin/settings.html", settings=settings_obj)
+    return render_template(
+        "admin/settings.html",
+        settings=settings_obj,
+        whatsapp={
+            "configured": bool(
+                current_app.config.get("TWILIO_ACCOUNT_SID")
+                and current_app.config.get("TWILIO_AUTH_TOKEN")
+                and current_app.config.get("TWILIO_WHATSAPP_FROM")
+            ),
+            "from_number": current_app.config.get("TWILIO_WHATSAPP_FROM", ""),
+            "sandbox": current_app.config.get("TWILIO_WHATSAPP_FROM", "").endswith("14155238886"),
+        },
+    )
 
 
 # ---------------------------------------------------------- bulk upload
