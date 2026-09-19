@@ -1935,7 +1935,7 @@ def _exam_students(exam, division_id=None):
 
 @admin_bp.route("/exams/<int:exam_id>/marks/template")
 @login_required
-@admin_required
+@office_required
 def exam_marks_template(exam_id):
     exam = Exam.query.get_or_404(exam_id)
     ensure_class_visible(exam.class_id)
@@ -1960,7 +1960,7 @@ def exam_marks_template(exam_id):
 
 @admin_bp.route("/exams/<int:exam_id>/marks/upload", methods=["POST"])
 @login_required
-@admin_required
+@office_required
 def exam_marks_upload(exam_id):
     exam = Exam.query.get_or_404(exam_id)
     ensure_class_visible(exam.class_id)
@@ -2043,7 +2043,7 @@ def exam_marks_upload(exam_id):
 
 @admin_bp.route("/exams/<int:exam_id>/marks", methods=["GET", "POST"])
 @login_required
-@admin_required
+@office_required
 def exam_marks(exam_id):
     exam = Exam.query.get_or_404(exam_id)
     ensure_class_visible(exam.class_id)
