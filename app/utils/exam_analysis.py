@@ -147,10 +147,19 @@ def student_progress(student, exams):
     """
     from ..models import ExamMark
 
+    from ..models import Student
+
     timeline = []
     for exam in sorted(exams, key=lambda e: e.exam_date):
-        result = compute_exam_results(exam, [student])[0]
-        if not result["complete"]:
+        # Rank only means anything against the rest of the class, so compute
+        # the whole class and pick this student's row out of it. Ranking a list
+        # of one student makes everybody first.
+        classmates = Student.query.filter_by(class_id=exam.class_id, active=True).all()
+        result = next(
+            (r for r in compute_exam_results(exam, classmates) if r["student"].id == student.id),
+            None,
+        )
+        if result is None or not result["complete"]:
             continue
 
         subjects = {}
