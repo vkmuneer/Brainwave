@@ -7,8 +7,9 @@
   <div class="card-body">
     <h6 class="text-bw-teal">Add an office coordinator</h6>
     <p class="text-muted small">
-      They can admit students, collect fees, mark attendance for any division and message
-      parents. They cannot change Settings or class fees, delete a recorded payment, manage
+      Each coordinator runs one branch and sees only that branch's students, fees,
+      attendance and exams. They can admit students, collect fees, mark attendance and
+      message parents within it. They cannot change Settings or class fees, delete a recorded payment, manage
       teacher accounts or reset passwords - those stay with you.
     </p>
     <form method="post">
@@ -22,6 +23,16 @@
           <label class="form-label">Username</label>
           <input type="text" name="username" class="form-control" required>
         </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Branch</label>
+        <select name="branch_id" class="form-select" required>
+          <option value="">Choose the branch they run</option>
+          {% for b in branches %}
+          <option value="{{ b.id }}">{{ b.name }}</option>
+          {% endfor %}
+        </select>
+        <div class="form-text">They will only see students, fees and attendance for this branch.</div>
       </div>
       <div class="mb-3">
         <label class="form-label">Password</label>
@@ -42,7 +53,21 @@
           <h6 class="fw-bold mb-0">{{ u.name }}</h6>
           {% if not u.active %}<span class="badge bg-secondary">Inactive</span>{% endif %}
         </div>
-        <div class="text-muted small mb-2">Username: {{ u.username }}</div>
+        <div class="text-muted small mb-2">
+          Username: {{ u.username }}<br>
+          Branch: <b>{{ u.branch.name if u.branch else 'not set - sees nothing' }}</b>
+        </div>
+
+        <form method="post" action="{{ url_for('admin.office_staff_branch', user_id=u.id) }}"
+              class="d-flex gap-2 mb-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <select name="branch_id" class="form-select form-select-sm">
+            {% for b in branches %}
+            <option value="{{ b.id }}" {{ 'selected' if u.branch_id == b.id }}>{{ b.name }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-sm btn-outline-secondary text-nowrap">Move</button>
+        </form>
 
         <form method="post" action="{{ url_for('admin.office_staff_password', user_id=u.id) }}"
               class="d-flex gap-2 mb-2">

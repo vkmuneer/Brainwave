@@ -108,6 +108,7 @@ def create_app(config_class=Config):
         _auto_migrate(app)
         _migrate_attendance_sessions(app)
         _backfill_video_approval(app)
+        _seed_branches(app)
         _backfill_masters(app)
         _ensure_seed_data(app)
 
@@ -221,6 +222,33 @@ def _migrate_attendance_sessions(app):
         conn.execute(text("DROP TABLE attendance_legacy"))
 
     app.logger.info("[migrate] rebuilt attendance with session in its key (%s rows)", before)
+
+
+def _seed_branches(app):
+    """Create the two branches and place existing classes in them.
+
+    Only runs while every class is still unassigned, so an admin who later
+    moves a class between branches does not have it put back on next boot.
+    """
+    from .models import Branch, SchoolClass
+
+    if SchoolClass.query.filter(SchoolClass.branch_id.isnot(None)).first():
+        return
+
+    layout = {"High School": ["9", "SSLC"], "Higher Secondary": ["+1", "+2"]}
+    for branch_name, class_names in layout.items():
+        branch = Branch.query.filter_by(name=branch_name).first()
+        if branch is None:
+            branch = Branch(name=branch_name)
+            db.session.add(branch)
+            db.session.flush()
+        for class_name in class_names:
+            school_class = SchoolClass.query.filter_by(name=class_name).first()
+            if school_class is not None and school_class.branch_id is None:
+                school_class.branch_id = branch.id
+
+    db.session.commit()
+    app.logger.info("[migrate] seeded branches and assigned classes")
 
 
 def _backfill_video_approval(app):

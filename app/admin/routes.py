@@ -25,8 +25,19 @@ from ..models import (
     PasswordResetRequest,
     VideoClass,
     AuditLog,
+    Branch,
 )
 from ..utils.decorators import admin_required, office_required
+from ..utils.scope import (
+    limit_students,
+    visible_classes,
+    visible_divisions,
+    visible_class_ids,
+    ensure_student_visible,
+    ensure_division_visible,
+    ensure_class_visible,
+    current_branch,
+)
 from ..utils.attendance import (
     resolve_session,
     session_label,
@@ -51,7 +62,7 @@ admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
 
 def _classes_sorted():
-    return sorted(SchoolClass.query.all(), key=lambda c: c.sort_key)
+    return visible_classes(sorted(SchoolClass.query.all(), key=lambda c: c.sort_key))
 
 
 def _subjects_sorted():
@@ -87,7 +98,7 @@ def _school_options(student=None):
 @login_required
 @office_required
 def dashboard():
-    students = Student.query.filter_by(active=True).all()
+    students = limit_students(Student.query.filter_by(active=True)).all()
     total_expected = sum(s.total_fee for s in students)
     total_collected = sum(s.total_paid for s in students)
     total_pending = round(total_expected - total_collected, 2)
@@ -130,14 +141,16 @@ def search():
     if q:
         like = f"%{q}%"
         results = (
-            Student.query.filter(
-                Student.active == True,  # noqa: E712
-                db.or_(
-                    Student.name.ilike(like),
-                    Student.admission_no.ilike(like),
-                    Student.parent_name.ilike(like),
-                    Student.parent_whatsapp.ilike(like),
-                ),
+            limit_students(
+                Student.query.filter(
+                    Student.active == True,  # noqa: E712
+                    db.or_(
+                        Student.name.ilike(like),
+                        Student.admission_no.ilike(like),
+                        Student.parent_name.ilike(like),
+                        Student.parent_whatsapp.ilike(like),
+                    ),
+                )
             )
             .order_by(Student.name)
             .all()
@@ -155,7 +168,7 @@ def students():
     q = request.args.get("q", "").strip()
     status = request.args.get("status", "")
 
-    query = Student.query.filter_by(active=True)
+    query = limit_students(Student.query.filter_by(active=True))
     if class_id:
         query = query.filter_by(class_id=class_id)
     if division_id:
@@ -186,7 +199,7 @@ def students():
 @login_required
 @office_required
 def student_form(student_id=None):
-    student = Student.query.get_or_404(student_id) if student_id else None
+    student = ensure_student_visible(Student.query.get_or_404(student_id)) if student_id else None
 
     if request.method == "POST":
         division_id = request.form.get("division_id", type=int)
@@ -246,7 +259,7 @@ def student_form(student_id=None):
 @login_required
 @office_required
 def student_detail(student_id):
-    student = Student.query.get_or_404(student_id)
+    student = ensure_student_visible(Student.query.get_or_404(student_id))
     return render_template("admin/student_detail.html", student=student)
 
 
@@ -254,7 +267,7 @@ def student_detail(student_id):
 @login_required
 @office_required
 def student_statement_pdf(student_id):
-    student = Student.query.get_or_404(student_id)
+    student = ensure_student_visible(Student.query.get_or_404(student_id))
     return _pdf_response(
         "pdf/student_statement_pdf.html",
         f"fee_statement_{student.admission_no}.pdf",
@@ -266,7 +279,7 @@ def student_statement_pdf(student_id):
 @login_required
 @admin_required
 def student_deactivate(student_id):
-    student = Student.query.get_or_404(student_id)
+    student = ensure_student_visible(Student.query.get_or_404(student_id))
     student.active = False
     db.session.commit()
     flash(f"{student.name} has been deactivated.", "info")
@@ -278,7 +291,7 @@ def student_deactivate(student_id):
 @login_required
 @office_required
 def add_payment(student_id):
-    student = Student.query.get_or_404(student_id)
+    student = ensure_student_visible(Student.query.get_or_404(student_id))
     amount = float(request.form.get("amount") or 0)
 
     if amount <= 0:
@@ -466,7 +479,27 @@ def teacher_activate(teacher_id):
 @login_required
 @admin_required
 def classes():
-    return render_template("admin/classes.html", classes=_classes_sorted())
+    return render_template(
+        "admin/classes.html",
+        classes=_classes_sorted(),
+        branches=Branch.query.order_by(Branch.name).all(),
+    )
+
+
+@admin_bp.route("/classes/<int:class_id>/branch", methods=["POST"])
+@login_required
+@admin_required
+def update_class_branch(class_id):
+    school_class = SchoolClass.query.get_or_404(class_id)
+    branch_id = request.form.get("branch_id", type=int)
+    school_class.branch_id = branch_id or None
+    db.session.commit()
+    flash(
+        f"Class {school_class.name} moved to "
+        f"{school_class.branch.name if school_class.branch else 'no branch'}.",
+        "success",
+    )
+    return redirect(url_for("admin.classes"))
 
 
 @admin_bp.route("/classes/<int:class_id>/update-fee", methods=["POST"])
@@ -698,7 +731,7 @@ def _compute_student_wise_report(args):
     class_id = args.get("class_id", type=int)
     q = args.get("q", "").strip()
 
-    query = Student.query.filter_by(active=True)
+    query = limit_students(Student.query.filter_by(active=True))
     if class_id:
         query = query.filter_by(class_id=class_id)
     if q:
@@ -769,7 +802,7 @@ def student_wise_report_pdf():
 def _compute_pending_fees_report(args):
     class_id = args.get("class_id", type=int)
     q = args.get("q", "").strip()
-    query = Student.query.filter_by(active=True)
+    query = limit_students(Student.query.filter_by(active=True))
     if class_id:
         query = query.filter_by(class_id=class_id)
     if q:
@@ -850,7 +883,7 @@ def _queue_fee_reminder(student):
 @login_required
 @office_required
 def send_fee_reminder(student_id):
-    student = Student.query.get_or_404(student_id)
+    student = ensure_student_visible(Student.query.get_or_404(student_id))
     if student.pending_fee <= 0:
         flash(f"{student.name} has no pending fee.", "info")
     else:
@@ -865,7 +898,7 @@ def send_fee_reminder(student_id):
 @office_required
 def send_bulk_fee_reminders():
     class_id = request.form.get("class_id", type=int)
-    query = Student.query.filter_by(active=True)
+    query = limit_students(Student.query.filter_by(active=True))
     if class_id:
         query = query.filter_by(class_id=class_id)
     pending_students = [s for s in query.all() if s.pending_fee > 0]
@@ -887,7 +920,7 @@ def send_bulk_fee_reminders():
 @office_required
 def discount_report():
     student_list = (
-        Student.query.filter(Student.active == True, Student.discount_amount > 0)  # noqa: E712
+        limit_students(Student.query.filter(Student.active == True, Student.discount_amount > 0))  # noqa: E712
         .order_by(Student.discount_amount.desc())
         .all()
     )
@@ -905,17 +938,16 @@ def attendance_report():
     report_date = (
         datetime.strptime(report_date_raw, "%Y-%m-%d").date() if report_date_raw else date.today()
     )
-    records = (
-        Attendance.query.filter_by(date=report_date)
-        .join(Student)
-        .order_by(Student.name)
-        .all()
-    )
+    class_ids = visible_class_ids()
+    records_q = Attendance.query.filter_by(date=report_date).join(Student)
+    if class_ids is not None:
+        records_q = records_q.filter(Student.class_id.in_(class_ids or [-1]))
+    records = records_q.order_by(Student.name).all()
     present = [r for r in records if r.status == "present"]
     absent = [r for r in records if r.status == "absent"]
 
     by_division = {}
-    for division in Division.query.all():
+    for division in visible_divisions(Division.query.all()):
         active_count = sum(1 for s in division.students if s.active)
         if active_count == 0:
             continue
@@ -965,15 +997,15 @@ def messages():
 def attendance_mark():
     """Office coordinator's register - any division, any session."""
     settings = Settings.get()
-    divisions = sorted(
-        Division.query.all(), key=lambda d: (d.school_class.sort_key, d.name)
+    divisions = visible_divisions(
+        sorted(Division.query.all(), key=lambda d: (d.school_class.sort_key, d.name))
     )
     if not divisions:
-        flash("Add a class division first.", "warning")
-        return redirect(url_for("admin.classes"))
+        flash("No class divisions are available for your branch.", "warning")
+        return redirect(url_for("admin.dashboard"))
 
     division_id = request.values.get("division_id", type=int) or divisions[0].id
-    division = Division.query.get_or_404(division_id)
+    division = ensure_division_visible(Division.query.get_or_404(division_id))
 
     date_raw = request.values.get("att_date")
     att_date = datetime.strptime(date_raw, "%Y-%m-%d").date() if date_raw else date.today()
@@ -1043,7 +1075,11 @@ def attendance_send_daily():
         )
         return redirect(url_for("admin.attendance_report", date=att_date.isoformat()))
 
-    records = Attendance.query.filter_by(date=att_date).all()
+    class_ids = visible_class_ids()
+    records_q = Attendance.query.filter_by(date=att_date)
+    if class_ids is not None:
+        records_q = records_q.join(Student).filter(Student.class_id.in_(class_ids or [-1]))
+    records = records_q.all()
     if not records:
         flash("No attendance has been marked for that date yet.", "warning")
         return redirect(url_for("admin.attendance_report", date=att_date.isoformat()))
@@ -1116,7 +1152,7 @@ def attendance_send_daily():
 @login_required
 @office_required
 def student_progress_report(student_id):
-    student = Student.query.get_or_404(student_id)
+    student = ensure_student_visible(Student.query.get_or_404(student_id))
     exams = Exam.query.filter_by(class_id=student.class_id).all()
     return render_template(
         "admin/student_progress.html",
@@ -1163,12 +1199,16 @@ def office_staff():
         name = request.form.get("name", "").strip()
         password = request.form.get("password", "")
 
+        branch_id = request.form.get("branch_id", type=int)
+
         if not username or not name or len(password) < 4:
             flash("Username, name and a password of at least 4 characters are required.", "danger")
+        elif not branch_id:
+            flash("Choose which branch this coordinator runs.", "danger")
         elif User.query.filter_by(username=username).first():
             flash("That username is already taken.", "danger")
         else:
-            user = User(username=username, name=name, role="office")
+            user = User(username=username, name=name, role="office", branch_id=branch_id)
             user.set_password(password)
             db.session.add(user)
             db.session.commit()
@@ -1178,7 +1218,25 @@ def office_staff():
     return render_template(
         "admin/office_staff.html",
         staff=User.query.filter_by(role="office").order_by(User.name).all(),
+        branches=Branch.query.order_by(Branch.name).all(),
     )
+
+
+@admin_bp.route("/office-staff/<int:user_id>/branch", methods=["POST"])
+@login_required
+@admin_required
+def office_staff_branch(user_id):
+    user = User.query.get_or_404(user_id)
+    if user.role != "office":
+        abort(404)
+    branch_id = request.form.get("branch_id", type=int)
+    if not branch_id or not Branch.query.get(branch_id):
+        flash("Choose a branch.", "danger")
+    else:
+        user.branch_id = branch_id
+        db.session.commit()
+        flash(f"{user.name} now runs {user.branch.name}.", "success")
+    return redirect(url_for("admin.office_staff"))
 
 
 @admin_bp.route("/office-staff/<int:user_id>/toggle", methods=["POST"])
@@ -1258,15 +1316,18 @@ def video_delete(video_id):
 
 def _broadcast_recipients(scope, class_id, division_id):
     """Active students matching the chosen audience, with a label for the UI."""
-    query = Student.query.filter_by(active=True)
+    query = limit_students(Student.query.filter_by(active=True))
 
     if scope == "division" and division_id:
-        division = Division.query.get_or_404(division_id)
+        division = ensure_division_visible(Division.query.get_or_404(division_id))
         return query.filter_by(division_id=division.id).all(), division.display_name
     if scope == "class" and class_id:
         school_class = SchoolClass.query.get_or_404(class_id)
+        ensure_class_visible(school_class.id)
         return query.filter_by(class_id=school_class.id).all(), f"Class {school_class.name}"
-    return query.all(), "All students"
+
+    branch = current_branch()
+    return query.all(), f"All students in {branch.name}" if branch else "All students"
 
 
 @admin_bp.route("/broadcast", methods=["GET", "POST"])
@@ -1274,7 +1335,7 @@ def _broadcast_recipients(scope, class_id, division_id):
 @office_required
 def broadcast():
     classes = _classes_sorted()
-    divisions = Division.query.join(SchoolClass).all()
+    divisions = visible_divisions(Division.query.join(SchoolClass).all())
 
     if request.method == "POST":
         template = request.form.get("message", "").strip()
@@ -1332,10 +1393,14 @@ def broadcast():
         return redirect(url_for("admin.messages"))
 
     counts = {
-        "all": Student.query.filter_by(active=True).count(),
-        "classes": {c.id: Student.query.filter_by(active=True, class_id=c.id).count() for c in classes},
+        "all": limit_students(Student.query.filter_by(active=True)).count(),
+        "classes": {
+            c.id: limit_students(Student.query.filter_by(active=True, class_id=c.id)).count()
+            for c in classes
+        },
         "divisions": {
-            d.id: Student.query.filter_by(active=True, division_id=d.id).count() for d in divisions
+            d.id: limit_students(Student.query.filter_by(active=True, division_id=d.id)).count()
+            for d in divisions
         },
     }
     return render_template(
@@ -1649,6 +1714,9 @@ def delete_school(school_id):
 @office_required
 def exams():
     exam_list = Exam.query.order_by(Exam.exam_date.desc()).all()
+    class_ids = visible_class_ids()
+    if class_ids is not None:
+        exam_list = [e for e in exam_list if e.class_id in class_ids]
     return render_template("admin/exams.html", exams=exam_list, classes=_classes_sorted())
 
 
@@ -1685,6 +1753,7 @@ def exam_form():
 @office_required
 def exam_detail(exam_id):
     exam = Exam.query.get_or_404(exam_id)
+    ensure_class_visible(exam.class_id)
     return render_template("admin/exam_detail.html", exam=exam, subjects=_subjects_sorted())
 
 
@@ -1693,6 +1762,7 @@ def exam_detail(exam_id):
 @admin_required
 def delete_exam(exam_id):
     exam = Exam.query.get_or_404(exam_id)
+    ensure_class_visible(exam.class_id)
     db.session.delete(exam)
     db.session.commit()
     flash(f"Exam '{exam.name}' and all its marks have been deleted.", "info")
@@ -1704,6 +1774,7 @@ def delete_exam(exam_id):
 @admin_required
 def add_exam_subject(exam_id):
     exam = Exam.query.get_or_404(exam_id)
+    ensure_class_visible(exam.class_id)
     subject_id = request.form.get("subject_id", type=int)
     max_marks = request.form.get("max_marks", type=float) or 100
     pass_marks = request.form.get("pass_marks", type=float) or 35
@@ -1742,6 +1813,7 @@ def _exam_students(exam, division_id=None):
 @admin_required
 def exam_marks(exam_id):
     exam = Exam.query.get_or_404(exam_id)
+    ensure_class_visible(exam.class_id)
     if not exam.exam_subjects:
         flash("Add at least one subject to this exam before entering marks.", "warning")
         return redirect(url_for("admin.exam_detail", exam_id=exam.id))
@@ -1812,6 +1884,7 @@ def _exam_report_context(exam, division_id=None):
 @office_required
 def exam_report(exam_id):
     exam = Exam.query.get_or_404(exam_id)
+    ensure_class_visible(exam.class_id)
     division_id = request.args.get("division_id", type=int)
     return render_template("admin/exam_report.html", **_exam_report_context(exam, division_id))
 
@@ -1821,6 +1894,7 @@ def exam_report(exam_id):
 @office_required
 def exam_report_pdf(exam_id):
     exam = Exam.query.get_or_404(exam_id)
+    ensure_class_visible(exam.class_id)
     division_id = request.args.get("division_id", type=int)
     context = _exam_report_context(exam, division_id)
     return _pdf_response(
@@ -1835,6 +1909,7 @@ def exam_report_pdf(exam_id):
 @office_required
 def exam_report_excel(exam_id):
     exam = Exam.query.get_or_404(exam_id)
+    ensure_class_visible(exam.class_id)
     division_id = request.args.get("division_id", type=int)
     students = _exam_students(exam, division_id)
     results = compute_exam_results(exam, students)
@@ -1878,7 +1953,8 @@ def exam_report_excel(exam_id):
 @office_required
 def exam_report_card_pdf(exam_id, student_id):
     exam = Exam.query.get_or_404(exam_id)
-    student = Student.query.get_or_404(student_id)
+    ensure_class_visible(exam.class_id)
+    student = ensure_student_visible(Student.query.get_or_404(student_id))
     result = compute_exam_results(exam, [student])[0]
     return _pdf_response(
         "pdf/report_card_pdf.html",

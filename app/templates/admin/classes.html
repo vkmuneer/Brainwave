@@ -7,8 +7,22 @@
   {% for c in classes %}
   <div class="col-12 col-md-6">
     <div class="card bw-card h-100">
-      <div class="card-header bg-white fw-bold">Class {{ c.name }}</div>
+      <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+        <span>Class {{ c.name }}</span>
+        <span class="badge bg-light text-dark border">{{ c.branch.name if c.branch else 'No branch' }}</span>
+      </div>
       <div class="card-body">
+        <form method="post" action="{{ url_for('admin.update_class_branch', class_id=c.id) }}"
+              class="d-flex gap-2 mb-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <select name="branch_id" class="form-select form-select-sm">
+            <option value="">No branch</option>
+            {% for b in branches %}
+            <option value="{{ b.id }}" {{ 'selected' if c.branch_id == b.id }}>{{ b.name }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-sm btn-outline-secondary text-nowrap">Set branch</button>
+        </form>
         <form method="post" action="{{ url_for('admin.update_class_fee', class_id=c.id) }}" class="row g-2 align-items-end mb-3">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="col-8">

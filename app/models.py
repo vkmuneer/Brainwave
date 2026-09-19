@@ -58,12 +58,28 @@ class SchoolMaster(db.Model):
         return f"<SchoolMaster {self.name}>"
 
 
+class Branch(db.Model):
+    """A campus or section of the academy - e.g. High School and Higher
+    Secondary - each run by its own office coordinator."""
+
+    __tablename__ = "branches"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), unique=True, nullable=False)
+
+    classes = db.relationship("SchoolClass", backref="branch")
+
+    def __repr__(self):
+        return f"<Branch {self.name}>"
+
+
 class SchoolClass(db.Model):
     __tablename__ = "school_classes"
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(20), unique=True, nullable=False)
     base_fee = db.Column(db.Float, nullable=False, default=0)
+    branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True)
 
     divisions = db.relationship(
         "Division", backref="school_class", cascade="all, delete-orphan", order_by="Division.name"
@@ -102,9 +118,14 @@ class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(10), nullable=False)  # 'admin' or 'teacher'
+    role = db.Column(db.String(10), nullable=False)  # admin / office / teacher
     name = db.Column(db.String(120), nullable=False)
     active = db.Column(db.Boolean, default=True, nullable=False)
+
+    # Which branch this account runs. NULL means every branch, which is what an
+    # admin gets; an office coordinator is expected to have one.
+    branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True)
+    branch = db.relationship("Branch")
 
     teacher = db.relationship("Teacher", backref="user", uselist=False, cascade="all, delete-orphan")
 
