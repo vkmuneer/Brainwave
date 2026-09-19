@@ -115,3 +115,116 @@ def parse_upload(file_stream):
                 record[header] = value
         rows.append(record)
     return rows
+
+
+# ----------------------------------------------------- exam marks bulk entry
+MARKS_SHEET = "Marks"
+
+
+def build_marks_template(exam, students, existing):
+    """A marks grid for one exam: a row per student, a column per subject.
+
+    Pre-filled with whatever is already entered, so the same sheet works for a
+    first entry and for a correction - and downloading it never loses marks
+    somebody has already typed in.
+
+    `existing` maps (student_id, exam_subject_id) -> marks.
+    """
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = MARKS_SHEET
+
+    exam_subjects = list(exam.exam_subjects)
+    headers = ["admission_no", "name", "class"] + [
+        f"{es.subject.name} (max {es.max_marks:g})" for es in exam_subjects
+    ]
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+
+    for student in students:
+        row = [
+            student.admission_no,
+            student.name,
+            f"{student.school_class.name}-{student.division.name}",
+        ]
+        for es in exam_subjects:
+            row.append(existing.get((student.id, es.id)))
+        ws.append(row)
+
+    for i, header in enumerate(headers, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = max(14, len(header) + 2)
+    ws.freeze_panes = "D2"
+
+    info = wb.create_sheet("Instructions")
+    info.append(["How to fill this sheet"])
+    info[1][0].font = Font(bold=True)
+    for line in [
+        "",
+        f"Exam: {exam.name} - Class {exam.school_class.name}",
+        "",
+        "Type each student's marks under the subject column.",
+        "Leave a cell blank to leave that mark unchanged.",
+        "Enter 0 for a student who sat the exam and scored nothing.",
+        "Do not change the admission_no column - it identifies the student.",
+        "Marks above the subject maximum are rejected and reported back to you.",
+        "Extra rows for students not in this class are ignored.",
+    ]:
+        info.append([line])
+    info.column_dimensions["A"].width = 70
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+
+def parse_marks_upload(file_stream):
+    """Reads a filled marks grid.
+
+    Returns (rows, subject_columns) where each row is
+    {"_row": n, "admission_no": str, "marks": {subject_name: value}}.
+    """
+    try:
+        wb = openpyxl.load_workbook(file_stream, data_only=True)
+    except Exception as exc:  # noqa: BLE001 - surface as a friendly upload error
+        raise ValueError(f"Not a valid Excel (.xlsx) file: {exc}") from exc
+
+    ws = wb[MARKS_SHEET] if MARKS_SHEET in wb.sheetnames else wb.worksheets[0]
+
+    try:
+        header_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
+    except StopIteration:
+        return [], []
+
+    subject_columns = {}
+    admission_col = None
+    for index, raw in enumerate(header_row):
+        if raw is None:
+            continue
+        header = str(raw).strip()
+        if _normalize_header(header) == "admission_no":
+            admission_col = index
+        elif header.lower() not in ("name", "class"):
+            # "Mathematics (max 100)" -> "Mathematics"
+            subject_columns[index] = header.split("(")[0].strip()
+
+    if admission_col is None:
+        raise ValueError("The sheet has no admission_no column - use the downloaded template.")
+
+    rows = []
+    for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        if row is None or all(cell in (None, "") for cell in row):
+            continue
+        admission_no = row[admission_col] if admission_col < len(row) else None
+        if admission_no in (None, ""):
+            continue
+        marks = {
+            name: row[index]
+            for index, name in subject_columns.items()
+            if index < len(row) and row[index] not in (None, "")
+        }
+        rows.append(
+            {"_row": row_idx, "admission_no": str(admission_no).strip(), "marks": marks}
+        )
+    return rows, list(subject_columns.values())

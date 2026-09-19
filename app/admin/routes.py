@@ -47,7 +47,12 @@ from ..utils.attendance import (
 )
 from ..utils.payment import build_pay_url, fee_reminder_message
 from ..utils.whatsapp import send_whatsapp_message
-from ..utils.excel import build_template, parse_upload
+from ..utils.excel import (
+    build_template,
+    parse_upload,
+    build_marks_template,
+    parse_marks_upload,
+)
 from ..utils.pdf import render_pdf
 from ..utils.exam_analysis import compute_exam_results, build_report_context, student_progress
 
@@ -1796,6 +1801,114 @@ def _exam_students(exam, division_id=None):
     if division_id:
         query = query.filter_by(division_id=division_id)
     return query.order_by(Student.name).all()
+
+
+@admin_bp.route("/exams/<int:exam_id>/marks/template")
+@login_required
+@admin_required
+def exam_marks_template(exam_id):
+    exam = Exam.query.get_or_404(exam_id)
+    ensure_class_visible(exam.class_id)
+    if not exam.exam_subjects:
+        flash("Add the exam's subjects before downloading the marks sheet.", "warning")
+        return redirect(url_for("admin.exam_detail", exam_id=exam.id))
+
+    students = _exam_students(exam, request.args.get("division_id", type=int))
+    existing = {
+        (mark.student_id, mark.exam_subject_id): mark.marks_obtained
+        for es in exam.exam_subjects
+        for mark in es.marks
+    }
+    buffer = build_marks_template(exam, students, existing)
+    return send_file(
+        buffer,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=f"marks_{exam.name.replace(' ', '_')}_{exam.school_class.name}.xlsx",
+    )
+
+
+@admin_bp.route("/exams/<int:exam_id>/marks/upload", methods=["POST"])
+@login_required
+@admin_required
+def exam_marks_upload(exam_id):
+    exam = Exam.query.get_or_404(exam_id)
+    ensure_class_visible(exam.class_id)
+
+    upload = request.files.get("file")
+    if not upload or not upload.filename:
+        flash("Choose a filled marks sheet (.xlsx) to upload.", "danger")
+        return redirect(url_for("admin.exam_detail", exam_id=exam.id))
+
+    try:
+        rows, _ = parse_marks_upload(upload)
+    except ValueError as exc:
+        flash(str(exc), "danger")
+        return redirect(url_for("admin.exam_detail", exam_id=exam.id))
+
+    subjects_by_name = {es.subject.name.strip().lower(): es for es in exam.exam_subjects}
+    students_by_admission = {
+        s.admission_no.strip().lower(): s for s in _exam_students(exam)
+    }
+
+    saved = skipped = 0
+    errors = []
+
+    for row in rows:
+        student = students_by_admission.get(row["admission_no"].lower())
+        if student is None:
+            skipped += 1
+            errors.append(f"Row {row['_row']}: no student {row['admission_no']} in this class.")
+            continue
+
+        for subject_name, raw in row["marks"].items():
+            exam_subject = subjects_by_name.get(subject_name.strip().lower())
+            if exam_subject is None:
+                errors.append(f"Row {row['_row']}: '{subject_name}' is not a subject of this exam.")
+                continue
+            try:
+                value = float(raw)
+            except (TypeError, ValueError):
+                errors.append(f"Row {row['_row']}: '{raw}' is not a number for {subject_name}.")
+                continue
+            if value < 0 or value > exam_subject.max_marks:
+                errors.append(
+                    f"Row {row['_row']}: {subject_name} must be between 0 and "
+                    f"{exam_subject.max_marks:g} (got {value:g})."
+                )
+                continue
+
+            mark = ExamMark.query.filter_by(
+                exam_subject_id=exam_subject.id, student_id=student.id
+            ).first()
+            if mark:
+                mark.marks_obtained = value
+                mark.entered_by = current_user.name
+            else:
+                db.session.add(
+                    ExamMark(
+                        exam_subject_id=exam_subject.id,
+                        student_id=student.id,
+                        marks_obtained=value,
+                        entered_by=current_user.name,
+                    )
+                )
+            saved += 1
+
+    db.session.commit()
+
+    if saved:
+        flash(f"Saved {saved} mark(s) from the uploaded sheet.", "success")
+    if skipped:
+        flash(f"{skipped} row(s) skipped - the student is not in this class.", "warning")
+    for message in errors[:12]:
+        flash(message, "warning")
+    if len(errors) > 12:
+        flash(f"...and {len(errors) - 12} more problem(s) not shown.", "warning")
+    if not saved and not errors:
+        flash("Nothing to save - every marks cell in the sheet was blank.", "info")
+
+    return redirect(url_for("admin.exam_detail", exam_id=exam.id))
 
 
 @admin_bp.route("/exams/<int:exam_id>/marks", methods=["GET", "POST"])

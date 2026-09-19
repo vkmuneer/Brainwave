@@ -64,6 +64,49 @@
   </div>
 
   <div class="col-12 col-md-6">
+    {% if exam.exam_subjects %}
+    <div class="card bw-card mb-3">
+      <div class="card-header bg-white fw-bold text-bw-teal">
+        <i class="bi bi-file-earmark-spreadsheet"></i> Enter marks from a spreadsheet
+      </div>
+      <div class="card-body">
+        <p class="text-muted small">
+          Download the sheet, type the marks under each subject column, and upload it back.
+          It comes pre-filled with whatever is already entered, so it is also the quickest
+          way to correct marks.
+        </p>
+
+        <form method="get" action="{{ url_for('admin.exam_marks_template', exam_id=exam.id) }}"
+              class="d-flex gap-2 mb-3">
+          <select name="division_id" class="form-select form-select-sm">
+            <option value="">All divisions</option>
+            {% for d in exam.school_class.divisions %}
+            <option value="{{ d.id }}">{{ d.display_name }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-sm btn-outline-secondary text-nowrap">
+            <i class="bi bi-download"></i> Download sheet
+          </button>
+        </form>
+
+        <form method="post" action="{{ url_for('admin.exam_marks_upload', exam_id=exam.id) }}"
+              enctype="multipart/form-data">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="d-flex gap-2">
+            <input type="file" name="file" class="form-control form-control-sm"
+                   accept=".xlsx" required>
+            <button class="btn btn-sm btn-bw-primary text-nowrap">
+              <i class="bi bi-upload"></i> Upload marks
+            </button>
+          </div>
+          <div class="form-text">
+            A blank cell leaves that mark unchanged. Enter 0 for a student who scored nothing.
+          </div>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
     <div class="card bw-card">
       <div class="card-header bg-white fw-bold text-bw-teal">Divisions in Class {{ exam.school_class.name }}</div>
       <ul class="list-group list-group-flush">
