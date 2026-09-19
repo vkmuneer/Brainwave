@@ -469,7 +469,7 @@ def video_add():
         )
     )
     db.session.commit()
-    flash(f'"{title}" is now visible to those students.', "success")
+    flash(f'"{title}" has been sent to the office for approval.', "success")
     return redirect(url_for("teacher.videos"))
 
 

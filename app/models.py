@@ -388,6 +388,24 @@ class VideoClass(db.Model):
     published = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
+    # Nothing reaches students until an admin has looked at it.
+    approval = db.Column(db.String(10), default="pending", nullable=False)  # pending/approved/rejected
+    reviewed_by = db.Column(db.String(120))
+    reviewed_at = db.Column(db.DateTime)
+    review_note = db.Column(db.String(255))
+
+    @property
+    def is_approved(self):
+        return self.approval == "approved"
+
+    @property
+    def status_label(self):
+        if self.approval == "rejected":
+            return "Rejected"
+        if self.approval != "approved":
+            return "Waiting for approval"
+        return "Visible to students" if self.published else "Approved, hidden by you"
+
     school_class = db.relationship("SchoolClass")
     division = db.relationship("Division")
     subject = db.relationship("Subject")
@@ -436,7 +454,9 @@ class VideoClass(db.Model):
         return None
 
     def visible_to(self, student):
-        if not self.published or student.class_id != self.class_id:
+        if not self.published or not self.is_approved:
+            return False
+        if student.class_id != self.class_id:
             return False
         return self.division_id is None or self.division_id == student.division_id
 

@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta
 from io import BytesIO
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request, send_file
+from flask import Blueprint, render_template, redirect, url_for, flash, request, send_file, abort
 from flask_login import login_required, current_user
 from sqlalchemy import func
 
@@ -1115,10 +1115,34 @@ def attendance_send_daily():
 @login_required
 @admin_required
 def videos():
+    all_videos = VideoClass.query.order_by(VideoClass.created_at.desc()).all()
     return render_template(
         "admin/videos.html",
-        videos=VideoClass.query.order_by(VideoClass.created_at.desc()).all(),
+        pending=[v for v in all_videos if v.approval == "pending"],
+        reviewed=[v for v in all_videos if v.approval != "pending"],
     )
+
+
+@admin_bp.route("/videos/<int:video_id>/review", methods=["POST"])
+@login_required
+@admin_required
+def video_review(video_id):
+    video = VideoClass.query.get_or_404(video_id)
+    decision = request.form.get("decision")
+    if decision not in ("approved", "rejected"):
+        abort(400)
+
+    video.approval = decision
+    video.reviewed_by = current_user.name
+    video.reviewed_at = datetime.utcnow()
+    video.review_note = request.form.get("review_note", "").strip()[:255]
+    db.session.commit()
+
+    if decision == "approved":
+        flash(f'"{video.title}" approved - students can now see it.', "success")
+    else:
+        flash(f'"{video.title}" rejected. The teacher will see this on their Videos page.', "info")
+    return redirect(url_for("admin.videos"))
 
 
 @admin_bp.route("/videos/<int:video_id>/delete", methods=["POST"])

@@ -50,20 +50,24 @@ def create_app(config_class=Config):
     @app.context_processor
     def inject_globals():
         pending_resets = 0
+        pending_videos = 0
         if current_user.is_authenticated and current_user.is_admin:
-            from .models import PasswordResetRequest
+            from .models import PasswordResetRequest, VideoClass
 
             pending_resets = PasswordResetRequest.query.filter_by(status="pending").count()
+            pending_videos = VideoClass.query.filter_by(approval="pending").count()
         return {
             "today": date.today(),
             "app_name": "Brainwave Academy",
             "pending_reset_count": pending_resets,
+            "pending_video_count": pending_videos,
         }
 
     with app.app_context():
         db.create_all()
         _auto_migrate(app)
         _migrate_attendance_sessions(app)
+        _backfill_video_approval(app)
         _backfill_masters(app)
         _ensure_seed_data(app)
 
@@ -177,6 +181,28 @@ def _migrate_attendance_sessions(app):
         conn.execute(text("DROP TABLE attendance_legacy"))
 
     app.logger.info("[migrate] rebuilt attendance with session in its key (%s rows)", before)
+
+
+def _backfill_video_approval(app):
+    """Approve videos that predate the approval step.
+
+    They were already visible to students, so leaving them NULL (and therefore
+    unapproved) would pull published class material offline on upgrade.
+    """
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(db.engine)
+    if "video_classes" not in inspector.get_table_names():
+        return
+    if "approval" not in {c["name"] for c in inspector.get_columns("video_classes")}:
+        return
+
+    with db.engine.begin() as conn:
+        updated = conn.execute(
+            text("UPDATE video_classes SET approval = 'approved' WHERE approval IS NULL")
+        ).rowcount
+    if updated:
+        app.logger.info("[migrate] approved %s pre-existing video(s)", updated)
 
 
 def _backfill_masters(app):

@@ -2,30 +2,83 @@
 {% block title %}Video Classes{% endblock %}
 {% block content %}
 <h4 class="text-bw-teal mb-3"><i class="bi bi-play-btn"></i> Video Classes</h4>
+
+<h6 class="text-bw-teal">Waiting for your approval</h6>
 <p class="text-muted small">
-  Everything teachers have published. Students see these in the portal once they log in -
-  only the videos for their own class.
+  Students cannot see a video until you approve it. Open the link and check it before
+  approving - once approved it is visible to every student of that class.
 </p>
 
+<div class="row g-3 mb-4">
+  {% for v in pending %}
+  <div class="col-12 col-md-6">
+    <div class="card bw-card h-100 border-warning">
+      <div class="card-body">
+        <div class="fw-bold">{{ v.title }}</div>
+        <div class="text-muted small mb-2">
+          {{ v.audience }}{% if v.subject %} &middot; {{ v.subject.name }}{% endif %}<br>
+          Uploaded by {{ v.uploaded_by_name or 'a teacher' }} on {{ v.created_at.strftime('%d-%m-%Y') }}
+        </div>
+        {% if v.description %}<p class="small">{{ v.description }}</p>{% endif %}
+        <a href="{{ v.url }}" target="_blank" rel="noopener"
+           class="btn btn-sm btn-outline-secondary mb-2">
+          <i class="bi bi-box-arrow-up-right"></i> Open the video
+        </a>
+        <form method="post" action="{{ url_for('admin.video_review', video_id=v.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="text" name="review_note" class="form-control form-control-sm mb-2"
+                 maxlength="255" placeholder="Note for the teacher (optional)">
+          <button name="decision" value="approved" class="btn btn-sm btn-bw-primary">Approve</button>
+          <button name="decision" value="rejected" class="btn btn-sm btn-outline-danger">Reject</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12"><p class="text-muted">Nothing waiting for approval.</p></div>
+  {% endfor %}
+</div>
+
+<h6 class="text-bw-teal">Reviewed</h6>
 <div class="table-responsive">
   <table class="table align-middle">
     <thead>
-      <tr><th>Title</th><th>Visible to</th><th>Subject</th><th>Teacher</th><th>Added</th><th></th></tr>
+      <tr><th>Title</th><th>Visible to</th><th>Teacher</th><th>Status</th><th>Reviewed</th><th></th></tr>
     </thead>
     <tbody>
-      {% for v in videos %}
+      {% for v in reviewed %}
       <tr>
         <td>
           <a href="{{ v.url }}" target="_blank" rel="noopener">{{ v.title }}</a>
-          {% if not v.published %}<span class="badge bg-secondary ms-1">Hidden</span>{% endif %}
-          {% if v.description %}<div class="text-muted small">{{ v.description }}</div>{% endif %}
+          {% if v.review_note %}<div class="text-muted small">Note: {{ v.review_note }}</div>{% endif %}
         </td>
         <td class="small">{{ v.audience }}</td>
-        <td class="small">{{ v.subject.name if v.subject else '-' }}</td>
         <td class="small">{{ v.uploaded_by_name or '-' }}</td>
-        <td class="small">{{ v.created_at.strftime('%d-%m-%Y') }}</td>
         <td>
-          <form method="post" action="{{ url_for('admin.video_delete', video_id=v.id) }}"
+          {% if v.approval == 'approved' %}
+            <span class="badge bg-success">Approved</span>
+            {% if not v.published %}<span class="badge bg-secondary">Hidden by teacher</span>{% endif %}
+          {% else %}
+            <span class="badge bg-danger">Rejected</span>
+          {% endif %}
+        </td>
+        <td class="small">
+          {{ v.reviewed_at.strftime('%d-%m-%Y') if v.reviewed_at else '-' }}
+          {% if v.reviewed_by %}<br>by {{ v.reviewed_by }}{% endif %}
+        </td>
+        <td class="text-nowrap">
+          {% if v.approval == 'rejected' %}
+          <form method="post" action="{{ url_for('admin.video_review', video_id=v.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button name="decision" value="approved" class="btn btn-sm btn-outline-success">Approve</button>
+          </form>
+          {% else %}
+          <form method="post" action="{{ url_for('admin.video_review', video_id=v.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button name="decision" value="rejected" class="btn btn-sm btn-outline-secondary">Withdraw</button>
+          </form>
+          {% endif %}
+          <form method="post" action="{{ url_for('admin.video_delete', video_id=v.id) }}" class="d-inline"
                 onsubmit="return confirm('Remove this video?');">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button class="btn btn-sm btn-outline-danger">Delete</button>
@@ -33,7 +86,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="6" class="text-muted">No videos published yet.</td></tr>
+      <tr><td colspan="6" class="text-muted">No videos reviewed yet.</td></tr>
       {% endfor %}
     </tbody>
   </table>

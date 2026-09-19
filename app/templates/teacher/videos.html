@@ -67,12 +67,30 @@
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-start">
           <div class="fw-bold">{{ v.title }}</div>
-          {% if not v.published %}<span class="badge bg-secondary">Hidden</span>{% endif %}
+          {% if v.approval == 'pending' %}
+            <span class="badge bg-warning text-dark">Awaiting approval</span>
+          {% elif v.approval == 'rejected' %}
+            <span class="badge bg-danger">Rejected</span>
+          {% elif not v.published %}
+            <span class="badge bg-secondary">Hidden</span>
+          {% else %}
+            <span class="badge bg-success">Live</span>
+          {% endif %}
         </div>
         <div class="text-muted small mb-2">
           {{ v.audience }}{% if v.subject %} &middot; {{ v.subject.name }}{% endif %}
           <br>{{ v.created_at.strftime('%d-%m-%Y') }}
         </div>
+        {% if v.approval == 'pending' %}
+        <div class="alert alert-warning py-1 px-2 small mb-2">
+          Students cannot see this yet - the office has to approve it first.
+        </div>
+        {% elif v.approval == 'rejected' %}
+        <div class="alert alert-danger py-1 px-2 small mb-2">
+          Not approved{% if v.review_note %}: {{ v.review_note }}{% endif %}.
+          Contact the office if you think this is a mistake.
+        </div>
+        {% endif %}
         {% if v.description %}<p class="small">{{ v.description }}</p>{% endif %}
         <div class="d-flex gap-2 flex-wrap">
           <a href="{{ v.url }}" target="_blank" rel="noopener"
