@@ -225,7 +225,6 @@ class Student(db.Model):
     dob = db.Column(db.Date, nullable=True)
     admission_date = db.Column(db.Date, default=date.today, nullable=False)
 
-    base_fee_override = db.Column(db.Float, nullable=True)
     discount_amount = db.Column(db.Float, default=0, nullable=False)
     discount_reason = db.Column(db.String(255))
 
@@ -238,7 +237,10 @@ class Student(db.Model):
 
     @property
     def class_fee(self):
-        return self.base_fee_override if self.base_fee_override is not None else self.school_class.base_fee
+        """The fee fixed for this class. Not adjustable per student - a
+        concession is recorded as a discount instead, so the reduction is
+        visible and shows up in the discount report."""
+        return self.school_class.base_fee
 
     @property
     def total_fee(self):

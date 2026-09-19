@@ -26,7 +26,6 @@ FIELD_LABELS = {
     "admission_date": "admission_date (YYYY-MM-DD)",
     "discount_amount": "discount_amount",
     "discount_reason": "discount_reason",
-    "base_fee_override": "base_fee_override",
 }
 
 ALL_FIELDS = list(FIELD_LABELS.keys())
@@ -69,7 +68,6 @@ def build_template(class_names):
     info.append(["admission_date", "No", "Format YYYY-MM-DD, defaults to today"])
     info.append(["discount_amount", "No", "Rupees, defaults to 0"])
     info.append(["discount_reason", "No", "e.g. Sibling discount"])
-    info.append(["base_fee_override", "No", "Leave blank to use the class's base fee"])
     info.column_dimensions["A"].width = 20
     info.column_dimensions["B"].width = 12
     info.column_dimensions["C"].width = 55

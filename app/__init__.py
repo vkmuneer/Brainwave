@@ -108,6 +108,7 @@ def create_app(config_class=Config):
         _auto_migrate(app)
         _migrate_attendance_sessions(app)
         _backfill_video_approval(app)
+        _drop_student_fee_override(app)
         _seed_branches(app)
         _backfill_masters(app)
         _ensure_seed_data(app)
@@ -222,6 +223,36 @@ def _migrate_attendance_sessions(app):
         conn.execute(text("DROP TABLE attendance_legacy"))
 
     app.logger.info("[migrate] rebuilt attendance with session in its key (%s rows)", before)
+
+
+def _drop_student_fee_override(app):
+    """Remove students.base_fee_override.
+
+    The course fee is fixed by the class; a concession is recorded as a
+    discount so it is visible and appears in the discount report. Leaving the
+    column would let a stale value quietly override a class fee later.
+    """
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(db.engine)
+    if "students" not in inspector.get_table_names():
+        return
+    if "base_fee_override" not in {c["name"] for c in inspector.get_columns("students")}:
+        return
+
+    with db.engine.begin() as conn:
+        in_use = conn.execute(
+            text("SELECT COUNT(*) FROM students WHERE base_fee_override IS NOT NULL")
+        ).scalar()
+        if in_use:
+            app.logger.warning(
+                "[migrate] %s student(s) still have a fee override; leaving the column in "
+                "place so the amounts are not silently changed",
+                in_use,
+            )
+            return
+        conn.execute(text("ALTER TABLE students DROP COLUMN base_fee_override"))
+    app.logger.info("[migrate] dropped students.base_fee_override")
 
 
 def _seed_branches(app):

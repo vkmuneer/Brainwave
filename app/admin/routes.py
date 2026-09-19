@@ -217,8 +217,6 @@ def student_form(student_id=None):
                 school_names=_school_options(student),
             )
 
-        override_raw = request.form.get("base_fee_override", "").strip()
-
         if student is None:
             student = Student(admission_no=admission_no)
             db.session.add(student)
@@ -231,7 +229,6 @@ def student_form(student_id=None):
         student.address = request.form.get("address", "").strip()
         student.place = request.form.get("place", "").strip()
         student.school_name = request.form.get("school_name", "").strip()
-        student.base_fee_override = float(override_raw) if override_raw else None
         student.discount_amount = float(request.form.get("discount_amount") or 0)
         student.discount_reason = request.form.get("discount_reason", "").strip()
 
@@ -1552,13 +1549,6 @@ def students_bulk_upload():
             except (TypeError, ValueError):
                 errors.append(f"Row {row_no}: invalid discount_amount, defaulted to 0.")
                 student.discount_amount = 0
-
-            override_raw = record.get("base_fee_override")
-            if override_raw not in (None, ""):
-                try:
-                    student.base_fee_override = float(override_raw)
-                except (TypeError, ValueError):
-                    errors.append(f"Row {row_no}: invalid base_fee_override, ignored.")
 
             db.session.add(student)
             existing_admission_nos.add(admission_no.lower())
