@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Office Staff{% endblock %}
+{% block content %}
+<h4 class="text-bw-teal mb-3"><i class="bi bi-person-badge"></i> Front Office Staff</h4>
+
+<div class="card bw-card mb-4" style="max-width: 560px;">
+  <div class="card-body">
+    <h6 class="text-bw-teal">Add an office coordinator</h6>
+    <p class="text-muted small">
+      They can admit students, collect fees, mark attendance for any division and message
+      parents. They cannot change Settings or class fees, delete a recorded payment, manage
+      teacher accounts or reset passwords - those stay with you.
+    </p>
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="row">
+        <div class="col-12 col-sm-6 mb-3">
+          <label class="form-label">Full name</label>
+          <input type="text" name="name" class="form-control" required>
+        </div>
+        <div class="col-12 col-sm-6 mb-3">
+          <label class="form-label">Username</label>
+          <input type="text" name="username" class="form-control" required>
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Password</label>
+        <input type="text" name="password" class="form-control" minlength="4" required>
+        <div class="form-text">Tell them this directly, and ask them to change it after first login.</div>
+      </div>
+      <button class="btn btn-bw-primary"><i class="bi bi-plus-lg"></i> Create login</button>
+    </form>
+  </div>
+</div>
+
+<div class="row g-3">
+  {% for u in staff %}
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="card bw-card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <h6 class="fw-bold mb-0">{{ u.name }}</h6>
+          {% if not u.active %}<span class="badge bg-secondary">Inactive</span>{% endif %}
+        </div>
+        <div class="text-muted small mb-2">Username: {{ u.username }}</div>
+
+        <form method="post" action="{{ url_for('admin.office_staff_password', user_id=u.id) }}"
+              class="d-flex gap-2 mb-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="text" name="password" class="form-control form-control-sm"
+                 placeholder="New password" minlength="4" required>
+          <button class="btn btn-sm btn-outline-secondary text-nowrap">Reset</button>
+        </form>
+
+        <form method="post" action="{{ url_for('admin.office_staff_toggle', user_id=u.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-sm {{ 'btn-outline-danger' if u.active else 'btn-outline-success' }}">
+            {{ 'Deactivate' if u.active else 'Activate' }}
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12"><p class="text-muted">No office logins yet.</p></div>
+  {% endfor %}
+</div>
+{% endblock %}

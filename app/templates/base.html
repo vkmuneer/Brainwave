@@ -27,7 +27,7 @@
     </button>
     <div class="collapse navbar-collapse" id="navMain">
       <ul class="navbar-nav me-auto">
-        {% if current_user.is_admin %}
+        {% if current_user.is_office_staff %}
         <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.dashboard') }}">Dashboard</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.students') }}">Students</a></li>
         <li class="nav-item dropdown">
@@ -58,9 +58,12 @@
           </ul>
         </li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.exams') }}"><i class="bi bi-journal-text"></i> Examinations</a></li>
+{% if current_user.is_admin %}
         <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.teachers') }}">Teachers</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.classes') }}">Classes</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.masters') }}">Master Data</a></li>
+        {% endif %}
+        {% if current_user.is_admin %}
         <li class="nav-item">
           <a class="nav-link" href="{{ url_for('admin.videos') }}">
             <i class="bi bi-play-btn"></i> Videos
@@ -69,6 +72,8 @@
             {% endif %}
           </a>
         </li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.office_staff') }}"><i class="bi bi-person-badge"></i> Office Staff</a></li>
+        {% endif %}
         <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.messages') }}">Messages</a></li>
         {% if pending_reset_count %}
         <li class="nav-item">
@@ -87,7 +92,7 @@
         {% endif %}
       </ul>
       <form class="d-flex mx-md-2 my-2 my-md-0" method="get"
-            action="{{ url_for('admin.search') if current_user.is_admin else url_for('teacher.search') }}">
+            action="{{ url_for('admin.search') if current_user.is_office_staff else url_for('teacher.search') }}">
         <input type="search" name="q" class="form-control form-control-sm" placeholder="Search students..." style="min-width: 200px;">
         <button class="btn btn-sm btn-light ms-1" type="submit"><i class="bi bi-search"></i></button>
       </form>
@@ -128,7 +133,7 @@
 
 {% if current_user.is_authenticated %}
 <nav class="bw-bottom-nav">
-  {% if current_user.is_admin %}
+  {% if current_user.is_office_staff %}
   <a href="{{ url_for('admin.dashboard') }}" class="{{ 'active' if request.endpoint == 'admin.dashboard' }}"><i class="bi bi-speedometer2"></i>Home</a>
   <a href="{{ url_for('admin.students') }}" class="{{ 'active' if request.endpoint and request.endpoint.startswith('admin.student') }}"><i class="bi bi-people"></i>Students</a>
   <a href="{{ url_for('admin.attendance_report') }}" class="{{ 'active' if request.endpoint == 'admin.attendance_report' }}"><i class="bi bi-check2-square"></i>Attend.</a>

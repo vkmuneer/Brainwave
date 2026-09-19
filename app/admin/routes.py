@@ -25,7 +25,7 @@ from ..models import (
     PasswordResetRequest,
     VideoClass,
 )
-from ..utils.decorators import admin_required
+from ..utils.decorators import admin_required, office_required
 from ..utils.attendance import (
     resolve_session,
     session_label,
@@ -84,7 +84,7 @@ def _school_options(student=None):
 # ---------------------------------------------------------------- dashboard
 @admin_bp.route("/dashboard")
 @login_required
-@admin_required
+@office_required
 def dashboard():
     students = Student.query.filter_by(active=True).all()
     total_expected = sum(s.total_fee for s in students)
@@ -122,7 +122,7 @@ def dashboard():
 # ------------------------------------------------------------------ search
 @admin_bp.route("/search")
 @login_required
-@admin_required
+@office_required
 def search():
     q = request.args.get("q", "").strip()
     results = []
@@ -147,7 +147,7 @@ def search():
 # ----------------------------------------------------------------- students
 @admin_bp.route("/students")
 @login_required
-@admin_required
+@office_required
 def students():
     class_id = request.args.get("class_id", type=int)
     division_id = request.args.get("division_id", type=int)
@@ -183,7 +183,7 @@ def students():
 @admin_bp.route("/students/new", methods=["GET", "POST"])
 @admin_bp.route("/students/<int:student_id>/edit", methods=["GET", "POST"])
 @login_required
-@admin_required
+@office_required
 def student_form(student_id=None):
     student = Student.query.get_or_404(student_id) if student_id else None
 
@@ -243,7 +243,7 @@ def student_form(student_id=None):
 
 @admin_bp.route("/students/<int:student_id>")
 @login_required
-@admin_required
+@office_required
 def student_detail(student_id):
     student = Student.query.get_or_404(student_id)
     return render_template("admin/student_detail.html", student=student)
@@ -251,7 +251,7 @@ def student_detail(student_id):
 
 @admin_bp.route("/students/<int:student_id>/statement/pdf")
 @login_required
-@admin_required
+@office_required
 def student_statement_pdf(student_id):
     student = Student.query.get_or_404(student_id)
     return _pdf_response(
@@ -275,7 +275,7 @@ def student_deactivate(student_id):
 # ------------------------------------------------------------ fee payments
 @admin_bp.route("/students/<int:student_id>/payments/add", methods=["POST"])
 @login_required
-@admin_required
+@office_required
 def add_payment(student_id):
     student = Student.query.get_or_404(student_id)
     amount = float(request.form.get("amount") or 0)
@@ -571,14 +571,14 @@ def _compute_finance_report(args):
 
 @admin_bp.route("/reports/finance")
 @login_required
-@admin_required
+@office_required
 def finance_report():
     return render_template("admin/finance_report.html", **_compute_finance_report(request.args))
 
 
 @admin_bp.route("/reports/finance/pdf")
 @login_required
-@admin_required
+@office_required
 def finance_report_pdf():
     data = _compute_finance_report(request.args)
     columns = ["Date", "Receipt", "Student", "Class", "Amount", "Mode", "Recorded By"]
@@ -649,14 +649,14 @@ def _compute_class_wise_report():
 
 @admin_bp.route("/reports/class-wise")
 @login_required
-@admin_required
+@office_required
 def class_wise_report():
     return render_template("admin/class_report.html", rows=_compute_class_wise_report())
 
 
 @admin_bp.route("/reports/class-wise/pdf")
 @login_required
-@admin_required
+@office_required
 def class_wise_report_pdf():
     rows = _compute_class_wise_report()
     columns = ["Class", "Students", "Expected Fee", "Collected", "Pending", "Present Today", "Absent Today"]
@@ -715,7 +715,7 @@ def _compute_student_wise_report(args):
 
 @admin_bp.route("/reports/student-wise")
 @login_required
-@admin_required
+@office_required
 def student_wise_report():
     student_list, class_id, q, totals = _compute_student_wise_report(request.args)
     return render_template(
@@ -730,7 +730,7 @@ def student_wise_report():
 
 @admin_bp.route("/reports/student-wise/pdf")
 @login_required
-@admin_required
+@office_required
 def student_wise_report_pdf():
     student_list, class_id, q, totals = _compute_student_wise_report(request.args)
     columns = ["Admission No.", "Name", "Class", "Total Fee", "Paid", "Pending", "Status"]
@@ -783,7 +783,7 @@ def _compute_pending_fees_report(args):
 
 @admin_bp.route("/reports/pending-fees")
 @login_required
-@admin_required
+@office_required
 def pending_fees_report():
     student_list, class_id, q, total_pending = _compute_pending_fees_report(request.args)
     return render_template(
@@ -798,7 +798,7 @@ def pending_fees_report():
 
 @admin_bp.route("/reports/pending-fees/pdf")
 @login_required
-@admin_required
+@office_required
 def pending_fees_report_pdf():
     student_list, class_id, q, total_pending = _compute_pending_fees_report(request.args)
     columns = ["Admission No.", "Name", "Class", "Parent WhatsApp", "Total Fee", "Paid", "Pending"]
@@ -847,7 +847,7 @@ def _queue_fee_reminder(student):
 
 @admin_bp.route("/students/<int:student_id>/send-fee-reminder", methods=["POST"])
 @login_required
-@admin_required
+@office_required
 def send_fee_reminder(student_id):
     student = Student.query.get_or_404(student_id)
     if student.pending_fee <= 0:
@@ -861,7 +861,7 @@ def send_fee_reminder(student_id):
 
 @admin_bp.route("/reports/pending-fees/send-reminders", methods=["POST"])
 @login_required
-@admin_required
+@office_required
 def send_bulk_fee_reminders():
     class_id = request.form.get("class_id", type=int)
     query = Student.query.filter_by(active=True)
@@ -883,7 +883,7 @@ def send_bulk_fee_reminders():
 
 @admin_bp.route("/reports/discounts")
 @login_required
-@admin_required
+@office_required
 def discount_report():
     student_list = (
         Student.query.filter(Student.active == True, Student.discount_amount > 0)  # noqa: E712
@@ -898,7 +898,7 @@ def discount_report():
 
 @admin_bp.route("/reports/attendance")
 @login_required
-@admin_required
+@office_required
 def attendance_report():
     report_date_raw = request.args.get("date")
     report_date = (
@@ -944,7 +944,7 @@ def attendance_report():
 # ---------------------------------------------------------------- messages
 @admin_bp.route("/messages")
 @login_required
-@admin_required
+@office_required
 def messages():
     q = request.args.get("q", "").strip()
     query = MessageLog.query.order_by(MessageLog.created_at.desc())
@@ -960,7 +960,7 @@ def messages():
 
 @admin_bp.route("/attendance/mark", methods=["GET", "POST"])
 @login_required
-@admin_required
+@office_required
 def attendance_mark():
     """Office coordinator's register - any division, any session."""
     settings = Settings.get()
@@ -1028,7 +1028,7 @@ def _daily_summary_sent_on(att_date):
 
 @admin_bp.route("/attendance/send-daily", methods=["POST"])
 @login_required
-@admin_required
+@office_required
 def attendance_send_daily():
     date_raw = request.form.get("att_date")
     att_date = datetime.strptime(date_raw, "%Y-%m-%d").date() if date_raw else date.today()
@@ -1113,7 +1113,7 @@ def attendance_send_daily():
 
 @admin_bp.route("/students/<int:student_id>/progress")
 @login_required
-@admin_required
+@office_required
 def student_progress_report(student_id):
     student = Student.query.get_or_404(student_id)
     exams = Exam.query.filter_by(class_id=student.class_id).all()
@@ -1122,6 +1122,65 @@ def student_progress_report(student_id):
         student=student,
         progress=student_progress(student, exams),
     )
+
+
+@admin_bp.route("/office-staff", methods=["GET", "POST"])
+@login_required
+@admin_required
+def office_staff():
+    """Front-office coordinator logins. Admin-only: these accounts can record
+    money, so who holds one is the administrator's decision."""
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        name = request.form.get("name", "").strip()
+        password = request.form.get("password", "")
+
+        if not username or not name or len(password) < 4:
+            flash("Username, name and a password of at least 4 characters are required.", "danger")
+        elif User.query.filter_by(username=username).first():
+            flash("That username is already taken.", "danger")
+        else:
+            user = User(username=username, name=name, role="office")
+            user.set_password(password)
+            db.session.add(user)
+            db.session.commit()
+            flash(f"Office login created for {name}.", "success")
+        return redirect(url_for("admin.office_staff"))
+
+    return render_template(
+        "admin/office_staff.html",
+        staff=User.query.filter_by(role="office").order_by(User.name).all(),
+    )
+
+
+@admin_bp.route("/office-staff/<int:user_id>/toggle", methods=["POST"])
+@login_required
+@admin_required
+def office_staff_toggle(user_id):
+    user = User.query.get_or_404(user_id)
+    if user.role != "office":
+        abort(404)
+    user.active = not user.active
+    db.session.commit()
+    flash(f"{user.name} has been {'activated' if user.active else 'deactivated'}.", "info")
+    return redirect(url_for("admin.office_staff"))
+
+
+@admin_bp.route("/office-staff/<int:user_id>/password", methods=["POST"])
+@login_required
+@admin_required
+def office_staff_password(user_id):
+    user = User.query.get_or_404(user_id)
+    if user.role != "office":
+        abort(404)
+    password = request.form.get("password", "")
+    if len(password) < 4:
+        flash("Password must be at least 4 characters.", "danger")
+    else:
+        user.set_password(password)
+        db.session.commit()
+        flash(f"Password updated for {user.name}.", "success")
+    return redirect(url_for("admin.office_staff"))
 
 
 @admin_bp.route("/videos")
@@ -1184,7 +1243,7 @@ def _broadcast_recipients(scope, class_id, division_id):
 
 @admin_bp.route("/broadcast", methods=["GET", "POST"])
 @login_required
-@admin_required
+@office_required
 def broadcast():
     classes = _classes_sorted()
     divisions = Division.query.join(SchoolClass).all()
@@ -1258,7 +1317,7 @@ def broadcast():
 
 @admin_bp.route("/messages/<int:message_id>/mark-sent", methods=["POST"])
 @login_required
-@admin_required
+@office_required
 def mark_message_sent(message_id):
     log = MessageLog.query.get_or_404(message_id)
     log.status = "sent"
@@ -1312,7 +1371,7 @@ def settings():
 # ---------------------------------------------------------- bulk upload
 @admin_bp.route("/students/bulk-upload", methods=["GET", "POST"])
 @login_required
-@admin_required
+@office_required
 def students_bulk_upload():
     if request.method == "POST":
         file = request.files.get("file")
@@ -1447,7 +1506,7 @@ def _parse_flexible_date(value):
 
 @admin_bp.route("/students/bulk-upload/template")
 @login_required
-@admin_required
+@office_required
 def students_bulk_upload_template():
     class_names = [c.name for c in _classes_sorted()]
     buffer = build_template(class_names)
@@ -1462,7 +1521,7 @@ def students_bulk_upload_template():
 # ----------------------------------------------------------------- masters
 @admin_bp.route("/masters")
 @login_required
-@admin_required
+@office_required
 def masters():
     return render_template(
         "admin/masters.html",
@@ -1504,7 +1563,7 @@ def delete_subject(subject_id):
 
 @admin_bp.route("/masters/places/add", methods=["POST"])
 @login_required
-@admin_required
+@office_required
 def add_place():
     name = request.form.get("name", "").strip()
     if not name:
@@ -1531,7 +1590,7 @@ def delete_place(place_id):
 
 @admin_bp.route("/masters/schools/add", methods=["POST"])
 @login_required
-@admin_required
+@office_required
 def add_school():
     name = request.form.get("name", "").strip()
     if not name:
@@ -1559,7 +1618,7 @@ def delete_school(school_id):
 # ------------------------------------------------------------------ exams
 @admin_bp.route("/exams")
 @login_required
-@admin_required
+@office_required
 def exams():
     exam_list = Exam.query.order_by(Exam.exam_date.desc()).all()
     return render_template("admin/exams.html", exams=exam_list, classes=_classes_sorted())
@@ -1595,7 +1654,7 @@ def exam_form():
 
 @admin_bp.route("/exams/<int:exam_id>")
 @login_required
-@admin_required
+@office_required
 def exam_detail(exam_id):
     exam = Exam.query.get_or_404(exam_id)
     return render_template("admin/exam_detail.html", exam=exam, subjects=_subjects_sorted())
@@ -1722,7 +1781,7 @@ def _exam_report_context(exam, division_id=None):
 
 @admin_bp.route("/exams/<int:exam_id>/report")
 @login_required
-@admin_required
+@office_required
 def exam_report(exam_id):
     exam = Exam.query.get_or_404(exam_id)
     division_id = request.args.get("division_id", type=int)
@@ -1731,7 +1790,7 @@ def exam_report(exam_id):
 
 @admin_bp.route("/exams/<int:exam_id>/report/pdf")
 @login_required
-@admin_required
+@office_required
 def exam_report_pdf(exam_id):
     exam = Exam.query.get_or_404(exam_id)
     division_id = request.args.get("division_id", type=int)
@@ -1745,7 +1804,7 @@ def exam_report_pdf(exam_id):
 
 @admin_bp.route("/exams/<int:exam_id>/report/excel")
 @login_required
-@admin_required
+@office_required
 def exam_report_excel(exam_id):
     exam = Exam.query.get_or_404(exam_id)
     division_id = request.args.get("division_id", type=int)
@@ -1788,7 +1847,7 @@ def exam_report_excel(exam_id):
 
 @admin_bp.route("/exams/<int:exam_id>/students/<int:student_id>/report-card")
 @login_required
-@admin_required
+@office_required
 def exam_report_card_pdf(exam_id, student_id):
     exam = Exam.query.get_or_404(exam_id)
     student = Student.query.get_or_404(student_id)

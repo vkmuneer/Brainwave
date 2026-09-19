@@ -122,6 +122,22 @@ class User(db.Model, UserMixin):
     def is_admin(self):
         return self.role == "admin"
 
+    @property
+    def is_office(self):
+        return self.role == "office"
+
+    @property
+    def is_office_staff(self):
+        """Anyone who works the admin side - admin or front office. Drives what
+        the menus offer; each route still states its own requirement."""
+        return self.role in ("admin", "office")
+
+    @property
+    def role_label(self):
+        return {"admin": "Administrator", "office": "Office Coordinator", "teacher": "Teacher"}.get(
+            self.role, self.role
+        )
+
     def __repr__(self):
         return f"<User {self.username} ({self.role})>"
 
