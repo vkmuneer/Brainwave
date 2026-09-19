@@ -45,7 +45,7 @@ from ..utils.attendance import (
     send_absence_alerts,
     existing_status_map,
 )
-from ..utils.payment import build_pay_url, fee_reminder_message
+from ..utils.payment import build_pay_url, fee_reminder_message, monthly_fee_statement
 from ..utils.whatsapp import send_whatsapp_message
 from ..utils.excel import (
     build_template,
@@ -1385,13 +1385,22 @@ def broadcast():
     classes = _classes_sorted()
     divisions = visible_divisions(Division.query.join(SchoolClass).all())
 
+    settings_obj = Settings.get()
+
     if request.method == "POST":
         template = request.form.get("message", "").strip()
         scope = request.form.get("scope", "all")
         class_id = request.form.get("class_id", type=int)
         division_id = request.form.get("division_id", type=int)
+        kind = request.form.get("kind", "custom")
+        fee_statement = kind == "fee_statement"
 
-        if not template:
+        as_of_raw = request.form.get("as_of", "")
+        as_of = (
+            datetime.strptime(as_of_raw, "%Y-%m-%d").date() if as_of_raw else date.today()
+        )
+
+        if not fee_statement and not template:
             flash("Please type a message to send.", "danger")
             return redirect(url_for("admin.broadcast"))
 
@@ -1400,18 +1409,41 @@ def broadcast():
             flash("No active students match that selection.", "warning")
             return redirect(url_for("admin.broadcast"))
 
+        settled = 0
+        if fee_statement:
+            # Telling a family who has paid in full that their balance is zero
+            # invites a worried phone call, so leave them out and say how many.
+            with_dues = [s for s in recipients if s.pending_fee > 0]
+            settled = len(recipients) - len(with_dues)
+            recipients = with_dues
+            if not recipients:
+                flash(
+                    f"Nobody in {audience} has a pending balance - nothing to send.", "info"
+                )
+                return redirect(url_for("admin.broadcast"))
+
         sent = failed = manual = 0
         for student in recipients:
-            message = (
-                template.replace("{name}", student.name)
-                .replace("{class}", f"{student.school_class.name}-{student.division.name}")
-                .replace("{pending}", f"{student.pending_fee:,.0f}")
-            )
+            if fee_statement:
+                message = monthly_fee_statement(
+                    student,
+                    build_pay_url(student.id),
+                    as_of,
+                    settings_obj.academy_name,
+                )
+                if template:
+                    message += f"\n\n{template}"
+            else:
+                message = (
+                    template.replace("{name}", student.name)
+                    .replace("{class}", f"{student.school_class.name}-{student.division.name}")
+                    .replace("{pending}", f"{student.pending_fee:,.0f}")
+                )
             result = send_whatsapp_message(student.parent_whatsapp, message)
             db.session.add(
                 MessageLog(
                     student_id=student.id,
-                    category="broadcast",
+                    category="fee_reminder" if fee_statement else "broadcast",
                     message=message,
                     phone=student.parent_whatsapp,
                     status=result["status"],
@@ -1438,7 +1470,18 @@ def broadcast():
             flash(f"Sent {sent} message(s) automatically to {audience}.", "success")
         if failed:
             flash(f"{failed} message(s) failed - see the details below.", "danger")
+        if settled:
+            flash(
+                f"{settled} student(s) in {audience} have paid in full and were not messaged.",
+                "info",
+            )
         return redirect(url_for("admin.messages"))
+
+    pending_counts = {
+        "all": sum(
+            1 for s in limit_students(Student.query.filter_by(active=True)).all() if s.pending_fee > 0
+        ),
+    }
 
     counts = {
         "all": limit_students(Student.query.filter_by(active=True)).count(),
@@ -1452,7 +1495,13 @@ def broadcast():
         },
     }
     return render_template(
-        "admin/broadcast.html", classes=classes, divisions=divisions, counts=counts
+        "admin/broadcast.html",
+        classes=classes,
+        divisions=divisions,
+        counts=counts,
+        pending_counts=pending_counts,
+        settings=settings_obj,
+        today=date.today(),
     )
 
 

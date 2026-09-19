@@ -47,6 +47,36 @@ def build_upi_link(upi_id: str, payee_name: str, amount: float, note: str) -> st
     return "upi://pay?" + urllib.parse.urlencode(params)
 
 
+def monthly_fee_statement(student, pay_url, as_of, academy_name="Brainwave Academy"):
+    """The month-end statement parents get: what the course costs, what has been
+    allowed off, what has been received, and what is still due as of a date.
+
+    Spelled out line by line rather than as a single "you owe X", because the
+    usual reply to a bare figure is a phone call asking how it was arrived at.
+    """
+    lines = [
+        f"{academy_name}",
+        f"Fee statement as on {as_of.strftime('%d-%m-%Y')}",
+        "",
+        f"Student: {student.name}",
+        f"Class: {student.school_class.name}-{student.division.name}",
+        "",
+        f"Course fee: Rs. {student.class_fee:,.0f}",
+    ]
+    if student.discount_amount:
+        lines.append(f"Discount: Rs. {student.discount_amount:,.0f}")
+        lines.append(f"Payable: Rs. {student.total_fee:,.0f}")
+    lines += [
+        f"Paid so far: Rs. {student.total_paid:,.0f}",
+        f"Balance due: Rs. {student.pending_fee:,.0f}",
+        "",
+        f"Pay now: {pay_url}",
+        "",
+        "Please ignore this message if you have already paid. Thank you.",
+    ]
+    return "\n".join(lines)
+
+
 def fee_reminder_message(student, pay_url):
     pending = student.pending_fee
     return (

@@ -8,11 +8,46 @@
     <form method="post">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
+      <label class="form-label">What are you sending?</label>
+      <div class="mb-2 form-check">
+        <input class="form-check-input" type="radio" name="kind" id="kind_custom" value="custom"
+               checked onchange="toggleKind()">
+        <label class="form-check-label" for="kind_custom">A message you write</label>
+      </div>
+      <div class="mb-3 form-check">
+        <input class="form-check-input" type="radio" name="kind" id="kind_fee" value="fee_statement"
+               onchange="toggleKind()">
+        <label class="form-check-label" for="kind_fee">
+          <b>Monthly fee statement</b> - course fee, discount, paid and balance, with a Pay Now link
+        </label>
+      </div>
+
+      <div id="feeOptions" class="border rounded p-3 mb-3 bg-light" hidden>
+        <div class="mb-2">
+          <label class="form-label">Statement date</label>
+          <input type="date" name="as_of" class="form-control" value="{{ today.isoformat() }}">
+          <div class="form-text">Usually the last day of the month you are billing for.</div>
+        </div>
+        {% if settings.upi_id %}
+        <div class="small text-muted">
+          Pay Now opens a page offering <b>{{ settings.upi_id }}</b> with the exact balance
+          filled in. Only students with a pending balance are messaged.
+        </div>
+        {% else %}
+        <div class="alert alert-warning small mb-0">
+          No UPI ID is set, so the Pay Now link will open a page with no payment option.
+          Set one under <a href="{{ url_for('admin.settings') }}">Settings</a> first.
+        </div>
+        {% endif %}
+      </div>
+
+      <hr>
       <label class="form-label">Send to</label>
       <div class="mb-2 form-check">
         <input class="form-check-input" type="radio" name="scope" id="scope_all" value="all" checked>
         <label class="form-check-label" for="scope_all">
-          Everyone <span class="text-muted">({{ counts.all }} students)</span>
+          Everyone <span class="text-muted">({{ counts.all }} students,
+          {{ pending_counts.all }} with a pending balance)</span>
         </label>
       </div>
 
@@ -37,10 +72,10 @@
       </select>
 
       <hr>
-      <label class="form-label">Message</label>
-      <textarea name="message" class="form-control" rows="5" required
+      <label class="form-label" id="messageLabel">Message</label>
+      <textarea name="message" id="messageBox" class="form-control" rows="5" required
                 placeholder="Dear Parent, there will be no class on Friday due to a public holiday. - Brainwave Academy"></textarea>
-      <div class="form-text mb-3">
+      <div class="form-text mb-3" id="messageHelp">
         You can use <code>{name}</code> for the student's name, <code>{class}</code> for their
         class and division, and <code>{pending}</code> for their pending fee amount.
       </div>
@@ -50,6 +85,24 @@
       </button>
       <a href="{{ url_for('admin.messages') }}" class="btn btn-outline-secondary">Cancel</a>
     </form>
+
+    <script>
+      function toggleKind() {
+        var fee = document.getElementById('kind_fee').checked;
+        document.getElementById('feeOptions').hidden = !fee;
+        var box = document.getElementById('messageBox');
+        box.required = !fee;
+        document.getElementById('messageLabel').textContent =
+          fee ? 'Anything to add at the end (optional)' : 'Message';
+        document.getElementById('messageHelp').innerHTML = fee
+          ? 'The fee figures and the Pay Now link are filled in for each student. Anything typed here is added below them.'
+          : 'You can use <code>{name}</code>, <code>{class}</code> and <code>{pending}</code>.';
+        box.placeholder = fee
+          ? 'e.g. Office is open 9am to 4pm for fee payment.'
+          : 'Dear Parent, there will be no class on Friday due to a public holiday.';
+      }
+      toggleKind();
+    </script>
   </div>
 </div>
 
