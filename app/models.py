@@ -244,20 +244,36 @@ class FeePayment(db.Model):
         return f"<FeePayment {self.student_id} {self.amount}>"
 
 
+ATTENDANCE_SESSIONS = {
+    "full": "Full day",
+    "fn": "Forenoon",
+    "an": "Afternoon",
+}
+
+
 class Attendance(db.Model):
     __tablename__ = "attendance"
-    __table_args__ = (db.UniqueConstraint("student_id", "date", name="uq_attendance_student_date"),)
+    # Session is part of the key: an academy marking twice a day needs a
+    # forenoon and an afternoon row for the same student on the same date.
+    __table_args__ = (
+        db.UniqueConstraint("student_id", "date", "session", name="uq_attendance_student_date_session"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey("students.id"), nullable=False)
     division_id = db.Column(db.Integer, db.ForeignKey("divisions.id"), nullable=False)
     date = db.Column(db.Date, nullable=False, default=date.today)
+    session = db.Column(db.String(4), nullable=False, default="full")  # full / fn / an
     status = db.Column(db.String(10), nullable=False)  # 'present' / 'absent'
     marked_by = db.Column(db.String(120))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    @property
+    def session_label(self):
+        return ATTENDANCE_SESSIONS.get(self.session, self.session)
+
     def __repr__(self):
-        return f"<Attendance {self.student_id} {self.date} {self.status}>"
+        return f"<Attendance {self.student_id} {self.date} {self.session} {self.status}>"
 
 
 class MessageLog(db.Model):
@@ -305,6 +321,18 @@ class Settings(db.Model):
     # both username and password, so it should only be reachable once the
     # academy has decided to switch it on.
     student_login_enabled = db.Column(db.Boolean, default=False, nullable=False)
+
+    # 'single' = one register a day, 'twice' = separate forenoon and afternoon.
+    attendance_sessions = db.Column(db.String(10), default="single", nullable=False)
+    instant_absence_alert = db.Column(db.Boolean, default=True, nullable=False)
+
+    @property
+    def twice_daily_attendance(self):
+        return self.attendance_sessions == "twice"
+
+    @property
+    def session_choices(self):
+        return ["fn", "an"] if self.twice_daily_attendance else ["full"]
 
     @property
     def contact_line(self):

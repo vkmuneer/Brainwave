@@ -63,6 +63,7 @@ def create_app(config_class=Config):
     with app.app_context():
         db.create_all()
         _auto_migrate(app)
+        _migrate_attendance_sessions(app)
         _backfill_masters(app)
         _ensure_seed_data(app)
 
@@ -118,6 +119,64 @@ def _auto_migrate(app):
             with db.engine.begin() as conn:
                 conn.execute(text(f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" {col_type}'))
             app.logger.info("[auto-migrate] added column %s.%s", table.name, column.name)
+
+
+def _migrate_attendance_sessions(app):
+    """Widen attendance's unique key from (student, date) to include session.
+
+    Marking twice a day needs two rows per student per date, which the original
+    constraint forbids. SQLite cannot drop a constraint declared inside CREATE
+    TABLE, so the table is rebuilt and its rows copied across as full-day
+    records; other databases can simply swap the constraint.
+    """
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(db.engine)
+    if "attendance" not in inspector.get_table_names():
+        return
+
+    constraints = inspector.get_unique_constraints("attendance")
+    stale = [c for c in constraints if set(c["column_names"]) == {"student_id", "date"}]
+    if not stale:
+        return
+
+    if db.engine.dialect.name != "sqlite":
+        with db.engine.begin() as conn:
+            for c in stale:
+                conn.execute(text(f'ALTER TABLE attendance DROP CONSTRAINT "{c["name"]}"'))
+            conn.execute(
+                text(
+                    "ALTER TABLE attendance ADD CONSTRAINT uq_attendance_student_date_session "
+                    "UNIQUE (student_id, date, session)"
+                )
+            )
+        app.logger.info("[migrate] attendance unique key now includes session")
+        return
+
+    with db.engine.begin() as conn:
+        before = conn.execute(text("SELECT COUNT(*) FROM attendance")).scalar()
+        conn.execute(text("ALTER TABLE attendance RENAME TO attendance_legacy"))
+
+    db.metadata.tables["attendance"].create(db.engine)
+
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO attendance "
+                "(id, student_id, division_id, date, session, status, marked_by, created_at) "
+                "SELECT id, student_id, division_id, date, 'full', status, marked_by, created_at "
+                "FROM attendance_legacy"
+            )
+        )
+        after = conn.execute(text("SELECT COUNT(*) FROM attendance")).scalar()
+        if after != before:
+            raise RuntimeError(
+                f"attendance migration copied {after} of {before} rows - left "
+                "attendance_legacy in place, database not modified further"
+            )
+        conn.execute(text("DROP TABLE attendance_legacy"))
+
+    app.logger.info("[migrate] rebuilt attendance with session in its key (%s rows)", before)
 
 
 def _backfill_masters(app):

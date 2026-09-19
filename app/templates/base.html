@@ -30,7 +30,15 @@
         {% if current_user.is_admin %}
         <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.dashboard') }}">Dashboard</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.students') }}">Students</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.attendance_report') }}"><i class="bi bi-check2-square"></i> Attendance</a></li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+            <i class="bi bi-check2-square"></i> Attendance
+          </a>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="{{ url_for('admin.attendance_mark') }}">Mark Attendance</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('admin.attendance_report') }}">Attendance Report</a></li>
+          </ul>
+        </li>
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
             <i class="bi bi-cash-coin"></i> Fees

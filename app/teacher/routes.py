@@ -17,6 +17,13 @@ from ..models import (
 )
 from ..utils.decorators import teacher_required
 from ..utils.whatsapp import send_whatsapp_message, absence_message
+from ..utils.attendance import (
+    resolve_session,
+    session_label,
+    save_attendance,
+    send_absence_alerts,
+    existing_status_map,
+)
 from ..utils.pdf import render_pdf
 from ..utils.exam_analysis import compute_exam_results, build_report_context
 
@@ -99,72 +106,43 @@ def attendance():
         flash("You have not been assigned to any class/division yet. Contact the admin.", "warning")
         return render_template("teacher/attendance.html", divisions=[], division=None, students=[])
 
+    settings = Settings.get()
     division_id = request.values.get("division_id", type=int) or divisions[0].id
     division = _get_authorized_division(division_id)
 
     date_raw = request.values.get("att_date")
     att_date = datetime.strptime(date_raw, "%Y-%m-%d").date() if date_raw else date.today()
+    session = resolve_session(request.values.get("session"), settings)
 
     students = sorted(
         [s for s in division.students if s.active], key=lambda s: s.name
     )
 
     if request.method == "POST":
-        existing = {
-            a.student_id: a
-            for a in Attendance.query.filter_by(division_id=division.id, date=att_date).all()
-        }
-        absentees = []
+        absentees = save_attendance(
+            division, att_date, session, students, request.form, current_user.name
+        )
+        alerted = send_absence_alerts(absentees, division, att_date, session, settings)
 
-        for student in students:
-            is_present = request.form.get(f"present_{student.id}") == "on"
-            status = "present" if is_present else "absent"
-            record = existing.get(student.id)
-            if record:
-                record.status = status
-                record.marked_by = current_user.name
-            else:
-                db.session.add(
-                    Attendance(
-                        student_id=student.id,
-                        division_id=division.id,
-                        date=att_date,
-                        status=status,
-                        marked_by=current_user.name,
-                    )
-                )
-            if not is_present:
-                absentees.append(student)
-
-        db.session.commit()
-
-        for student in absentees:
-            message = absence_message(student, division.school_class.name, division.name, att_date)
-            result = send_whatsapp_message(student.parent_whatsapp, message)
-            db.session.add(
-                MessageLog(
-                    student_id=student.id,
-                    date=att_date,
-                    message=message,
-                    phone=student.parent_whatsapp,
-                    status=result["status"],
-                    detail=result["detail"],
-                    manual_link=result.get("link"),
-                )
-            )
-        db.session.commit()
-
+        label = "" if session == "full" else f" ({session_label(session)})"
+        note = (
+            f"{alerted} WhatsApp alert(s) queued."
+            if alerted
+            else "Instant absence alerts are switched off."
+        )
         flash(
-            f"Attendance saved for {division.display_name} on {att_date.strftime('%d-%m-%Y')}. "
-            f"{len(absentees)} absentee(s) - WhatsApp notifications queued.",
+            f"Attendance saved for {division.display_name}{label} on "
+            f"{att_date.strftime('%d-%m-%Y')}. {len(absentees)} absentee(s). {note}",
             "success",
         )
-        return redirect(url_for("teacher.attendance", division_id=division.id, att_date=att_date.isoformat()))
-
-    existing_map = {
-        a.student_id: a.status
-        for a in Attendance.query.filter_by(division_id=division.id, date=att_date).all()
-    }
+        return redirect(
+            url_for(
+                "teacher.attendance",
+                division_id=division.id,
+                att_date=att_date.isoformat(),
+                session=session,
+            )
+        )
 
     return render_template(
         "teacher/attendance.html",
@@ -172,7 +150,9 @@ def attendance():
         division=division,
         students=students,
         att_date=att_date,
-        existing_map=existing_map,
+        session=session,
+        settings=settings,
+        existing_map=existing_status_map(division.id, att_date, session),
     )
 
 

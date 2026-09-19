@@ -26,6 +26,13 @@ from ..models import (
     VideoClass,
 )
 from ..utils.decorators import admin_required
+from ..utils.attendance import (
+    resolve_session,
+    session_label,
+    save_attendance,
+    send_absence_alerts,
+    existing_status_map,
+)
 from ..utils.payment import build_pay_url, fee_reminder_message
 from ..utils.whatsapp import send_whatsapp_message
 from ..utils.excel import build_template, parse_upload
@@ -916,7 +923,10 @@ def attendance_report():
             "total": active_count,
             "present": sum(1 for r in marked if r.status == "present"),
             "absent": sum(1 for r in marked if r.status == "absent"),
-            "unmarked": active_count - len(marked),
+            # Counted by student, not by row: in twice-daily mode one student
+            # contributes two rows, which would otherwise read as two students
+            # marked and push this negative.
+            "unmarked": active_count - len({r.student_id for r in marked}),
         }
 
     return render_template(
@@ -925,6 +935,9 @@ def attendance_report():
         present=present,
         absent=absent,
         by_division=by_division,
+        settings=Settings.get(),
+        students_marked=len({r.student_id for r in records}),
+        daily_sent=_daily_summary_sent_on(report_date),
     )
 
 
@@ -943,6 +956,159 @@ def messages():
     logs = query.limit(200).all()
     pending_count = MessageLog.query.filter_by(status="manual").count()
     return render_template("admin/messages.html", logs=logs, pending_count=pending_count, q=q)
+
+
+@admin_bp.route("/attendance/mark", methods=["GET", "POST"])
+@login_required
+@admin_required
+def attendance_mark():
+    """Office coordinator's register - any division, any session."""
+    settings = Settings.get()
+    divisions = sorted(
+        Division.query.all(), key=lambda d: (d.school_class.sort_key, d.name)
+    )
+    if not divisions:
+        flash("Add a class division first.", "warning")
+        return redirect(url_for("admin.classes"))
+
+    division_id = request.values.get("division_id", type=int) or divisions[0].id
+    division = Division.query.get_or_404(division_id)
+
+    date_raw = request.values.get("att_date")
+    att_date = datetime.strptime(date_raw, "%Y-%m-%d").date() if date_raw else date.today()
+    session = resolve_session(request.values.get("session"), settings)
+
+    students = sorted([s for s in division.students if s.active], key=lambda s: s.name)
+
+    if request.method == "POST":
+        absentees = save_attendance(
+            division, att_date, session, students, request.form, current_user.name
+        )
+        alerted = send_absence_alerts(absentees, division, att_date, session, settings)
+        label = "" if session == "full" else f" ({session_label(session)})"
+        note = (
+            f"{alerted} WhatsApp alert(s) queued."
+            if alerted
+            else "Instant absence alerts are switched off."
+        )
+        flash(
+            f"Attendance saved for {division.display_name}{label} on "
+            f"{att_date.strftime('%d-%m-%Y')}. {len(absentees)} absentee(s). {note}",
+            "success",
+        )
+        return redirect(
+            url_for(
+                "admin.attendance_mark",
+                division_id=division.id,
+                att_date=att_date.isoformat(),
+                session=session,
+            )
+        )
+
+    return render_template(
+        "admin/attendance_mark.html",
+        divisions=divisions,
+        division=division,
+        students=students,
+        att_date=att_date,
+        session=session,
+        settings=settings,
+        existing_map=existing_status_map(division.id, att_date, session),
+    )
+
+
+def _daily_summary_sent_on(att_date):
+    """The log row for a daily summary already sent for this date, if any."""
+    return (
+        MessageLog.query.filter_by(category="daily_attendance", date=att_date)
+        .order_by(MessageLog.created_at.desc())
+        .first()
+    )
+
+
+@admin_bp.route("/attendance/send-daily", methods=["POST"])
+@login_required
+@admin_required
+def attendance_send_daily():
+    date_raw = request.form.get("att_date")
+    att_date = datetime.strptime(date_raw, "%Y-%m-%d").date() if date_raw else date.today()
+
+    already = _daily_summary_sent_on(att_date)
+    if already:
+        flash(
+            f"Today's attendance was already sent to parents at "
+            f"{already.created_at.strftime('%d-%m-%Y %I:%M %p')}.",
+            "warning",
+        )
+        return redirect(url_for("admin.attendance_report", date=att_date.isoformat()))
+
+    records = Attendance.query.filter_by(date=att_date).all()
+    if not records:
+        flash("No attendance has been marked for that date yet.", "warning")
+        return redirect(url_for("admin.attendance_report", date=att_date.isoformat()))
+
+    by_student = {}
+    for record in records:
+        by_student.setdefault(record.student_id, []).append(record)
+
+    settings_obj = Settings.get()
+    sent = failed = manual = 0
+
+    for student_id, rows in by_student.items():
+        student = db.session.get(Student, student_id)
+        if student is None or not student.active:
+            continue
+
+        # Chronological, not alphabetical: 'an' sorts before 'fn' but the
+        # afternoon does not come first.
+        order = {"fn": 0, "an": 1, "full": 2}
+        rows.sort(key=lambda r: order.get(r.session, 9))
+
+        if len(rows) == 1 and rows[0].session == "full":
+            body = "was PRESENT" if rows[0].status == "present" else "was ABSENT"
+        else:
+            parts = [f"{session_label(r.session)} {r.status.upper()}" for r in rows]
+            body = " - ".join(parts)
+
+        message = (
+            f"Dear Parent, attendance for {student.name} (Class "
+            f"{student.school_class.name}-{student.division.name}) on "
+            f"{att_date.strftime('%d-%m-%Y')}: {body}. - {settings_obj.academy_name}"
+        )
+
+        result = send_whatsapp_message(student.parent_whatsapp, message)
+        db.session.add(
+            MessageLog(
+                student_id=student.id,
+                date=att_date,
+                category="daily_attendance",
+                message=message,
+                phone=student.parent_whatsapp,
+                status=result["status"],
+                detail=result["detail"],
+                manual_link=result["link"],
+            )
+        )
+        if result["status"] == "sent":
+            sent += 1
+        elif result["status"] == "failed":
+            failed += 1
+        else:
+            manual += 1
+
+    db.session.commit()
+
+    if manual:
+        flash(
+            f"Prepared {manual} daily attendance message(s). Twilio is not configured, so "
+            "tap 'Send on WhatsApp' against each on the Messages page.",
+            "info",
+        )
+    if sent:
+        flash(f"Sent {sent} daily attendance message(s) to parents.", "success")
+    if failed:
+        flash(f"{failed} message(s) failed - see the Messages page.", "danger")
+    return redirect(url_for("admin.attendance_report", date=att_date.isoformat()))
 
 
 @admin_bp.route("/videos")
@@ -1079,6 +1245,9 @@ def settings():
         settings_obj.upi_id = request.form.get("upi_id", "").strip()
         settings_obj.upi_payee_name = request.form.get("upi_payee_name", "").strip()
         settings_obj.student_login_enabled = bool(request.form.get("student_login_enabled"))
+        sessions_mode = request.form.get("attendance_sessions", "single")
+        settings_obj.attendance_sessions = sessions_mode if sessions_mode in ("single", "twice") else "single"
+        settings_obj.instant_absence_alert = bool(request.form.get("instant_absence_alert"))
 
         upload = request.files.get("logo")
         if request.form.get("remove_logo"):
