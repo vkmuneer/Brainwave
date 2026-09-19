@@ -73,6 +73,7 @@
           </a>
         </li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.office_staff') }}"><i class="bi bi-person-badge"></i> Office Staff</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.audit_log') }}"><i class="bi bi-clock-history"></i> Audit Log</a></li>
         {% endif %}
         <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.messages') }}">Messages</a></li>
         {% if pending_reset_count %}

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Audit Log{% endblock %}
+{% block content %}
+<h4 class="text-bw-teal mb-1"><i class="bi bi-clock-history"></i> Audit Log</h4>
+<p class="text-muted small">
+  Every change to students, payments, fees, accounts, settings, exams and videos -
+  who made it, when, and what the value was before. Attendance and exam marks are not
+  listed here; they already record who marked them.
+</p>
+
+<form method="get" class="row g-2 mb-3">
+  <div class="col-6 col-md-3">
+    <select name="entity" class="form-select" onchange="this.form.submit()">
+      <option value="">All records</option>
+      {% for e in entity_types %}
+      <option value="{{ e }}" {{ 'selected' if entity == e }}>{{ e | capitalize }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-md-3">
+    <input type="text" name="actor" class="form-control" placeholder="Who made the change" value="{{ actor }}">
+  </div>
+  <div class="col-12 col-md-2">
+    <button class="btn btn-outline-secondary w-100">Filter</button>
+  </div>
+</form>
+
+<div class="table-responsive">
+  <table class="table align-middle">
+    <thead>
+      <tr><th>When</th><th>Who</th><th>Action</th><th>Record</th><th>What changed</th></tr>
+    </thead>
+    <tbody>
+      {% for e in entries %}
+      <tr>
+        <td class="small text-nowrap">{{ e.created_at.strftime('%d-%m-%Y') }}<br>
+          <span class="text-muted">{{ e.created_at.strftime('%I:%M %p') }}</span></td>
+        <td class="small">
+          {{ e.actor_name }}
+          {% if e.actor_role %}<div class="text-muted">{{ e.actor_role }}</div>{% endif %}
+        </td>
+        <td>
+          <span class="badge
+            {{ 'bg-success' if e.action == 'created' else ('bg-danger' if e.action == 'deleted' else 'bg-secondary') }}">
+            {{ e.action }}
+          </span>
+        </td>
+        <td class="small">
+          <span class="text-muted">{{ e.entity_type }}</span><br>
+          {{ e.entity_label or '-' }}
+        </td>
+        <td class="small">
+          {% if e.summary %}
+          <pre class="mb-0 small" style="white-space: pre-wrap; font-family: inherit;">{{ e.summary }}</pre>
+          {% else %}
+          <span class="text-muted">-</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="text-muted">No changes recorded yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if entries | length == 300 %}
+<p class="text-muted small">Showing the 300 most recent changes. Narrow with the filters above.</p>
+{% endif %}
+{% endblock %}

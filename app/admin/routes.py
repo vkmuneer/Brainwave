@@ -24,6 +24,7 @@ from ..models import (
     ExamMark,
     PasswordResetRequest,
     VideoClass,
+    AuditLog,
 )
 from ..utils.decorators import admin_required, office_required
 from ..utils.attendance import (
@@ -1121,6 +1122,33 @@ def student_progress_report(student_id):
         "admin/student_progress.html",
         student=student,
         progress=student_progress(student, exams),
+    )
+
+
+@admin_bp.route("/audit-log")
+@login_required
+@admin_required
+def audit_log():
+    entity = request.args.get("entity", "").strip()
+    actor = request.args.get("actor", "").strip()
+
+    query = AuditLog.query.order_by(AuditLog.created_at.desc())
+    if entity:
+        query = query.filter_by(entity_type=entity)
+    if actor:
+        query = query.filter(AuditLog.actor_name.ilike(f"%{actor}%"))
+
+    entries = query.limit(300).all()
+    entity_types = [
+        row[0]
+        for row in db.session.query(AuditLog.entity_type).distinct().order_by(AuditLog.entity_type)
+    ]
+    return render_template(
+        "admin/audit_log.html",
+        entries=entries,
+        entity_types=entity_types,
+        entity=entity,
+        actor=actor,
     )
 
 

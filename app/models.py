@@ -377,6 +377,31 @@ _YOUTUBE_ID = re.compile(r"^[A-Za-z0-9_-]{6,20}$")
 _DRIVE_ID = re.compile(r"^[A-Za-z0-9_-]{10,80}$")
 
 
+class AuditLog(db.Model):
+    """Who changed what, and from what to what.
+
+    Written automatically from a session hook rather than by each route, so a
+    new edit screen is covered without anyone remembering to log it.
+    """
+
+    __tablename__ = "audit_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    actor_name = db.Column(db.String(120))
+    actor_role = db.Column(db.String(10))
+
+    action = db.Column(db.String(10), nullable=False)  # created / updated / deleted
+    entity_type = db.Column(db.String(40), nullable=False, index=True)
+    entity_id = db.Column(db.Integer)
+    entity_label = db.Column(db.String(160))
+    summary = db.Column(db.Text)
+
+    def __repr__(self):
+        return f"<AuditLog {self.action} {self.entity_type}#{self.entity_id}>"
+
+
 class VideoClass(db.Model):
     """A recorded class a teacher publishes to one class (or one division).
 

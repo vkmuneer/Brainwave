@@ -18,6 +18,10 @@ def create_app(config_class=Config):
     csrf.init_app(app)
     login_manager.init_app(app)
 
+    from .utils.audit import register_audit_hooks
+
+    register_audit_hooks(db)
+
     from .models import User
 
     @login_manager.user_loader
