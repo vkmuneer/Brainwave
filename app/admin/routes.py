@@ -188,6 +188,46 @@ def students():
     elif status == "paid":
         student_list = [s for s in student_list if s.pending_fee <= 0]
 
+    # Optional: narrow by how a student did in one exam - e.g. everyone under
+    # 35% in the Mid Term, to plan extra sessions.
+    exam_id = request.args.get("exam_id", type=int)
+    min_pct = request.args.get("min_pct", type=float)
+    max_pct = request.args.get("max_pct", type=float)
+    scores = {}
+    exam = None
+
+    if exam_id:
+        exam = Exam.query.get_or_404(exam_id)
+        ensure_class_visible(exam.class_id)
+
+        # Rank against the whole class, then filter - otherwise the rank shown
+        # would be a position within whatever the other filters left behind.
+        whole_class = Student.query.filter_by(class_id=exam.class_id, active=True).all()
+        for result in compute_exam_results(exam, whole_class):
+            if result["complete"]:
+                scores[result["student"].id] = result
+
+        in_class = [s for s in student_list if s.class_id == exam.class_id]
+
+        def keep(student):
+            result = scores.get(student.id)
+            if result is None:
+                return False  # no complete result for this exam
+            pct = result["percentage"]
+            if min_pct is not None and pct < min_pct:
+                return False
+            if max_pct is not None and pct > max_pct:
+                return False
+            return True
+
+        student_list = [s for s in in_class if keep(s)]
+        student_list.sort(key=lambda s: scores[s.id]["percentage"], reverse=True)
+
+    exam_options = Exam.query.order_by(Exam.exam_date.desc()).all()
+    visible_ids = visible_class_ids()
+    if visible_ids is not None:
+        exam_options = [e for e in exam_options if e.class_id in visible_ids]
+
     return render_template(
         "admin/students.html",
         students=student_list,
@@ -196,6 +236,12 @@ def students():
         selected_division_id=division_id,
         q=q,
         status=status,
+        exam_options=exam_options,
+        exam=exam,
+        exam_id=exam_id,
+        min_pct=min_pct,
+        max_pct=max_pct,
+        scores=scores,
     )
 
 

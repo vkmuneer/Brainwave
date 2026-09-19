@@ -31,7 +31,43 @@
   <div class="col-4 col-md-2">
     <button class="btn btn-outline-secondary w-100" type="submit">Search</button>
   </div>
+
+  <div class="col-12"><hr class="my-1"></div>
+  <div class="col-12 col-md-4">
+    <select name="exam_id" class="form-select" onchange="this.form.submit()">
+      <option value="">Filter by exam marks...</option>
+      {% for e in exam_options %}
+      <option value="{{ e.id }}" {{ 'selected' if exam_id == e.id }}>
+        {{ e.name }} - Class {{ e.school_class.name }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-md-2">
+    <input type="number" name="min_pct" class="form-control" min="0" max="100" step="1"
+           placeholder="Min %" value="{{ min_pct if min_pct is not none else '' }}">
+  </div>
+  <div class="col-6 col-md-2">
+    <input type="number" name="max_pct" class="form-control" min="0" max="100" step="1"
+           placeholder="Max %" value="{{ max_pct if max_pct is not none else '' }}">
+  </div>
+  <div class="col-6 col-md-2">
+    <button class="btn btn-outline-secondary w-100" type="submit">Apply</button>
+  </div>
+  {% if exam %}
+  <div class="col-6 col-md-2">
+    <a href="{{ url_for('admin.students') }}" class="btn btn-outline-secondary w-100">Clear</a>
+  </div>
+  {% endif %}
 </form>
+
+{% if exam %}
+<p class="text-muted small">
+  Showing {{ students | length }} student(s) from <b>{{ exam.name }} - Class
+  {{ exam.school_class.name }}</b>{% if min_pct is not none %}, scoring {{ min_pct }}% or more{% endif %}{% if max_pct is not none %}{{ ' and' if min_pct is not none }} {{ max_pct }}% or less{% endif %},
+  best first. Students whose marks are not fully entered for this exam are not listed.
+</p>
+{% endif %}
 
 <!-- Mobile card list -->
 <div class="d-md-none">
@@ -40,8 +76,13 @@
     <div class="card bw-card mb-2">
       <div class="card-body py-2 px-3 d-flex justify-content-between align-items-center">
         <div>
-          <div class="fw-bold">{{ s.name }}</div>
-          <div class="small text-muted">{{ s.admission_no }} &middot; {{ s.school_class.name }}-{{ s.division.name }}</div>
+          <div class="fw-bold"><span class="text-muted">{{ loop.index }}.</span> {{ s.name }}</div>
+          <div class="small text-muted">
+            {{ s.admission_no }} &middot; {{ s.school_class.name }}-{{ s.division.name }}
+            {% if exam %}{% set r = scores.get(s.id) %}
+            <br><b>{{ r.percentage }}%</b> in {{ exam.name }} &middot; rank {{ r.rank or '-' }}
+            {% endif %}
+          </div>
         </div>
         <span class="badge {{ 'badge-paid' if s.payment_status == 'Paid' else ('badge-partial' if s.payment_status == 'Partial' else 'badge-unpaid') }}">
           {{ s.payment_status }}
@@ -60,9 +101,11 @@
     <table class="table table-hover mb-0 align-middle">
       <thead>
         <tr>
+          <th style="width: 3rem;">#</th>
           <th>Admission No.</th>
           <th>Name</th>
           <th>Class</th>
+          {% if exam %}<th class="text-end">Marks</th><th class="text-end">%</th><th class="text-end">Rank</th>{% endif %}
           <th>Parent WhatsApp</th>
           <th>Pending Fee</th>
           <th>Status</th>
@@ -72,9 +115,16 @@
       <tbody>
         {% for s in students %}
         <tr>
+          <td class="text-muted">{{ loop.index }}</td>
           <td>{{ s.admission_no }}</td>
           <td>{{ s.name }}</td>
           <td>{{ s.school_class.name }}-{{ s.division.name }}</td>
+          {% if exam %}
+          {% set r = scores.get(s.id) %}
+          <td class="text-end">{{ r.total_obtained | int }} / {{ r.total_max | int }}</td>
+          <td class="text-end fw-bold {{ 'text-danger' if r.status == 'Fail' }}">{{ r.percentage }}%</td>
+          <td class="text-end">{{ r.rank or '-' }}</td>
+          {% endif %}
           <td>{{ s.parent_whatsapp }}</td>
           <td>₹{{ "{:,.0f}".format(s.pending_fee) }}</td>
           <td><span class="badge {{ 'badge-paid' if s.payment_status == 'Paid' else ('badge-partial' if s.payment_status == 'Partial' else 'badge-unpaid') }}">{{ s.payment_status }}</span></td>
@@ -84,7 +134,7 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="7" class="text-muted text-center">No students found.</td></tr>
+        <tr><td colspan="{{ 11 if exam else 8 }}" class="text-muted text-center">No students found.</td></tr>
         {% endfor %}
       </tbody>
     </table>
