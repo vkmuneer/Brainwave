@@ -37,7 +37,7 @@ from ..utils.payment import build_pay_url, fee_reminder_message
 from ..utils.whatsapp import send_whatsapp_message
 from ..utils.excel import build_template, parse_upload
 from ..utils.pdf import render_pdf
-from ..utils.exam_analysis import compute_exam_results, build_report_context
+from ..utils.exam_analysis import compute_exam_results, build_report_context, student_progress
 
 
 def _pdf_response(template_name, filename, **context):
@@ -1109,6 +1109,19 @@ def attendance_send_daily():
     if failed:
         flash(f"{failed} message(s) failed - see the Messages page.", "danger")
     return redirect(url_for("admin.attendance_report", date=att_date.isoformat()))
+
+
+@admin_bp.route("/students/<int:student_id>/progress")
+@login_required
+@admin_required
+def student_progress_report(student_id):
+    student = Student.query.get_or_404(student_id)
+    exams = Exam.query.filter_by(class_id=student.class_id).all()
+    return render_template(
+        "admin/student_progress.html",
+        student=student,
+        progress=student_progress(student, exams),
+    )
 
 
 @admin_bp.route("/videos")

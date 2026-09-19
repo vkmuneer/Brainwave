@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Progress - {{ student.name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="text-bw-teal m-0">{{ student.name }}</h4>
+    <div class="text-muted small">
+      {{ student.admission_no }} &middot; Class {{ student.school_class.name }}-{{ student.division.name }}
+    </div>
+  </div>
+  <a href="{{ url_for('admin.student_detail', student_id=student.id) }}"
+     class="btn btn-sm btn-outline-secondary">Back to student</a>
+</div>
+
+{% if not progress %}
+<div class="card bw-card"><div class="card-body text-muted">
+  No completed exams yet for this student. Results appear here once every subject of an
+  exam has a mark entered.
+</div></div>
+{% else %}
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3">
+    <div class="card bw-stat-card h-100"><div class="card-body">
+      <div class="stat-value">{{ progress.latest.result.percentage }}%</div>
+      <div class="small">{{ progress.latest.exam.name }}</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card bw-card h-100"><div class="card-body">
+      <div class="text-muted small">Change</div>
+      {% if progress.overall_delta is none %}
+      <div class="fs-5 text-muted">First exam</div>
+      {% else %}
+      <div class="fs-5 fw-bold {{ 'text-success' if progress.overall_delta > 0 else ('text-danger' if progress.overall_delta < 0 else '') }}">
+        {{ '+' if progress.overall_delta > 0 }}{{ progress.overall_delta }} pts
+      </div>
+      <div class="text-muted small">vs {{ progress.previous.exam.name }}</div>
+      {% endif %}
+    </div></div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card bw-card h-100"><div class="card-body">
+      <div class="text-muted small">Grade</div>
+      <div class="fs-5 fw-bold">{{ progress.latest.result.grade }}</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card bw-card h-100"><div class="card-body">
+      <div class="text-muted small">Rank in class</div>
+      <div class="fs-5 fw-bold">{{ progress.latest.result.rank or '-' }}</div>
+    </div></div>
+  </div>
+</div>
+
+<div class="card bw-card mb-3"><div class="card-body">
+  <h6 class="text-bw-teal">What to do next</h6>
+  {% for tip in progress.suggestions %}
+  <div class="d-flex gap-2 mb-2">
+    <span class="badge align-self-start
+      {{ 'bg-danger' if tip.level == 'critical' else ('bg-warning text-dark' if tip.level == 'warning' else 'bg-success') }}">
+      {{ 'Act now' if tip.level == 'critical' else ('Watch' if tip.level == 'warning' else 'Good') }}
+    </span>
+    <div class="small">{{ tip.text }}</div>
+  </div>
+  {% endfor %}
+</div></div>
+
+{% for key in ['trend', 'subjects'] %}
+{% if progress.charts.get(key) %}
+<div class="card bw-card mb-3"><div class="card-body">
+  <img src="{{ progress.charts[key] }}" class="img-fluid" alt="{{ key }} chart">
+</div></div>
+{% endif %}
+{% endfor %}
+
+{% if progress.movement %}
+<div class="card bw-card mb-3">
+  <div class="card-header bg-white fw-bold text-bw-teal">
+    Subject by subject &mdash; {{ progress.previous.exam.name }} to {{ progress.latest.exam.name }}
+  </div>
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead>
+        <tr>
+          <th>Subject</th>
+          <th class="text-end">{{ progress.previous.exam.name }}</th>
+          <th class="text-end">{{ progress.latest.exam.name }}</th>
+          <th class="text-end">Change</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in progress.movement %}
+        <tr>
+          <td>{{ m.subject }}</td>
+          <td class="text-end text-muted">{{ m.previous }}%</td>
+          <td class="text-end fw-bold">{{ m.latest }}%</td>
+          <td class="text-end {{ 'text-success' if m.trend == 'improved' else ('text-danger' if m.trend == 'declined' else 'text-muted') }}">
+            {{ '+' if m.delta > 0 }}{{ m.delta }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="card bw-card">
+  <div class="card-header bg-white fw-bold text-bw-teal">All exams</div>
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead>
+        <tr><th>Exam</th><th>Date</th><th class="text-end">Total</th>
+            <th class="text-end">%</th><th class="text-end">Grade</th><th class="text-end">Result</th></tr>
+      </thead>
+      <tbody>
+        {% for t in progress.timeline | reverse %}
+        <tr>
+          <td>{{ t.exam.name }}</td>
+          <td class="small text-muted">{{ t.exam.exam_date.strftime('%d-%m-%Y') }}</td>
+          <td class="text-end">{{ t.result.total_obtained | int }} / {{ t.result.total_max | int }}</td>
+          <td class="text-end fw-bold">{{ t.result.percentage }}%</td>
+          <td class="text-end">{{ t.result.grade }}</td>
+          <td class="text-end">
+            <span class="badge {{ 'bg-success' if t.result.status == 'Pass' else 'bg-danger' }}">
+              {{ t.result.status }}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
