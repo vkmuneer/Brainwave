@@ -2,7 +2,7 @@ import os
 from datetime import date
 
 import click
-from flask import Flask
+from flask import Flask, render_template
 
 from config import Config
 from .extensions import db, csrf, login_manager
@@ -50,6 +50,42 @@ def create_app(config_class=Config):
         if current_user.is_admin:
             return redirect(url_for("admin.dashboard"))
         return redirect(url_for("teacher.dashboard"))
+
+    def _error_page(heading, message, icon, code):
+        """A dead end should say who you are and offer a way back - Flask's
+        default 403 just says the resource is 'read-protected', which tells a
+        teacher or office coordinator nothing about what to do next."""
+        return render_template("error.html", heading=heading, message=message, icon=icon), code
+
+    @app.errorhandler(403)
+    def _forbidden(_error):
+        return _error_page(
+            "Not available to your login",
+            "Your account does not have access to this page. If you need something from "
+            "it, ask the academy administrator.",
+            "bi-lock",
+            403,
+        )
+
+    @app.errorhandler(404)
+    def _not_found(_error):
+        return _error_page(
+            "Page not found",
+            "That link does not lead anywhere. It may have been removed, or the record "
+            "may have been deleted.",
+            "bi-question-circle",
+            404,
+        )
+
+    @app.errorhandler(500)
+    def _server_error(_error):
+        return _error_page(
+            "Something went wrong",
+            "The page could not be loaded. Please try again - if it keeps happening, "
+            "note what you were doing and tell the administrator.",
+            "bi-exclamation-triangle",
+            500,
+        )
 
     @app.context_processor
     def inject_globals():
