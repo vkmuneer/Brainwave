@@ -110,6 +110,7 @@ def create_app(config_class=Config):
         _backfill_video_approval(app)
         _drop_student_fee_override(app)
         _seed_branches(app)
+        _seed_fee_schedules(app)
         _backfill_masters(app)
         _ensure_seed_data(app)
 
@@ -253,6 +254,35 @@ def _drop_student_fee_override(app):
             return
         conn.execute(text("ALTER TABLE students DROP COLUMN base_fee_override"))
     app.logger.info("[migrate] dropped students.base_fee_override")
+
+
+def _seed_fee_schedules(app):
+    """Default installment plans, only for classes that have none set.
+
+    May end, then a monthly step: Class 9 3,000 + 1,000; SSLC 5,000 + 1,000;
+    +1 and +2 5,000 + 2,000 - which lands each class on its full fee.
+    """
+    from .models import SchoolClass
+
+    defaults = {
+        "9": (3000, 1000),
+        "SSLC": (5000, 1000),
+        "+1": (5000, 2000),
+        "+2": (5000, 2000),
+    }
+    changed = False
+    for name, (first, monthly) in defaults.items():
+        school_class = SchoolClass.query.filter_by(name=name).first()
+        if school_class is None or school_class.has_schedule:
+            continue
+        school_class.first_installment = first
+        school_class.monthly_installment = monthly
+        school_class.schedule_start_month = 5
+        changed = True
+
+    if changed:
+        db.session.commit()
+        app.logger.info("[migrate] seeded default fee installment plans")
 
 
 def _seed_branches(app):

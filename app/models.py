@@ -81,6 +81,45 @@ class SchoolClass(db.Model):
     base_fee = db.Column(db.Float, nullable=False, default=0)
     branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True)
 
+    # Installment plan: a larger first payment at the end of the starting month,
+    # then a fixed step each month until the whole fee is covered.
+    first_installment = db.Column(db.Float, default=0, nullable=False)
+    monthly_installment = db.Column(db.Float, default=0, nullable=False)
+    schedule_start_month = db.Column(db.Integer, default=5, nullable=False)  # 5 = May
+
+    @property
+    def has_schedule(self):
+        return bool(self.first_installment or self.monthly_installment)
+
+    def months_elapsed(self, on_date):
+        """Whole months from the start month to `on_date`, wrapping the year -
+        May is 0, December 7, the following January 8."""
+        delta = on_date.month - self.schedule_start_month
+        return delta if delta >= 0 else delta + 12
+
+    def scheduled_due(self, on_date, cap):
+        """How much should have been paid by the end of `on_date`'s month.
+
+        Capped at `cap` (the student's own payable amount after any discount),
+        so a discounted student simply finishes the plan earlier rather than
+        being asked for more than they owe.
+        """
+        if not self.has_schedule:
+            return cap
+        steps = self.months_elapsed(on_date)
+        due = self.first_installment + self.monthly_installment * steps
+        return min(due, cap)
+
+    def schedule_summary(self):
+        if not self.has_schedule:
+            return "No installment plan - the whole fee is due."
+        start = date(2000, self.schedule_start_month, 1).strftime("%B")
+        return (
+            f"Rs. {self.first_installment:,.0f} by end of {start}, then "
+            f"Rs. {self.monthly_installment:,.0f} a month until "
+            f"Rs. {self.base_fee:,.0f} is covered."
+        )
+
     divisions = db.relationship(
         "Division", backref="school_class", cascade="all, delete-orphan", order_by="Division.name"
     )

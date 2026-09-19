@@ -23,6 +23,38 @@
           </select>
           <button class="btn btn-sm btn-outline-secondary text-nowrap">Set branch</button>
         </form>
+
+        <form method="post" action="{{ url_for('admin.update_class_schedule', class_id=c.id) }}"
+              class="border rounded p-2 mb-3 bg-light">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="small fw-bold text-bw-teal mb-1">Installment plan</div>
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label small mb-0">First payment</label>
+              <input type="number" step="1" min="0" name="first_installment"
+                     class="form-control form-control-sm" value="{{ c.first_installment | int }}">
+            </div>
+            <div class="col-6">
+              <label class="form-label small mb-0">Each month after</label>
+              <input type="number" step="1" min="0" name="monthly_installment"
+                     class="form-control form-control-sm" value="{{ c.monthly_installment | int }}">
+            </div>
+            <div class="col-8">
+              <label class="form-label small mb-0">Starting month</label>
+              <select name="schedule_start_month" class="form-select form-select-sm">
+                {% for m in range(1, 13) %}
+                <option value="{{ m }}" {{ 'selected' if c.schedule_start_month == m }}>
+                  {{ month_names[m] }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-4 d-flex align-items-end">
+              <button class="btn btn-sm btn-outline-secondary w-100">Save</button>
+            </div>
+          </div>
+          <div class="form-text">{{ c.schedule_summary() }}</div>
+        </form>
         <form method="post" action="{{ url_for('admin.update_class_fee', class_id=c.id) }}" class="row g-2 align-items-end mb-3">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="col-8">

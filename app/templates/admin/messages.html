@@ -3,9 +3,14 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h4 class="text-bw-teal m-0">WhatsApp Messages</h4>
-  <a href="{{ url_for('admin.broadcast') }}" class="btn btn-bw-primary">
-    <i class="bi bi-megaphone"></i> New Broadcast
-  </a>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('admin.broadcast', kind='fee_statement') }}" class="btn btn-bw-primary">
+      <i class="bi bi-cash-coin"></i> Monthly Fee Reminder
+    </a>
+    <a href="{{ url_for('admin.broadcast') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-megaphone"></i> New Broadcast
+    </a>
+  </div>
 </div>
 
 {% if pending_count %}

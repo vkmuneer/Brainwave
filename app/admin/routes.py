@@ -1,3 +1,4 @@
+import calendar
 from datetime import date, datetime, timedelta
 from io import BytesIO
 
@@ -531,7 +532,26 @@ def classes():
         "admin/classes.html",
         classes=_classes_sorted(),
         branches=Branch.query.order_by(Branch.name).all(),
+        month_names=list(calendar.month_name),
     )
+
+
+@admin_bp.route("/classes/<int:class_id>/schedule", methods=["POST"])
+@login_required
+@admin_required
+def update_class_schedule(class_id):
+    school_class = SchoolClass.query.get_or_404(class_id)
+    first = request.form.get("first_installment", type=float)
+    monthly = request.form.get("monthly_installment", type=float)
+    start = request.form.get("schedule_start_month", type=int)
+
+    school_class.first_installment = max(first or 0, 0)
+    school_class.monthly_installment = max(monthly or 0, 0)
+    if start and 1 <= start <= 12:
+        school_class.schedule_start_month = start
+    db.session.commit()
+    flash(f"Installment plan updated for Class {school_class.name}.", "success")
+    return redirect(url_for("admin.classes"))
 
 
 @admin_bp.route("/classes/<int:class_id>/branch", methods=["POST"])
@@ -1411,14 +1431,27 @@ def broadcast():
 
         settled = 0
         if fee_statement:
+            include_ontrack = bool(request.form.get("include_ontrack"))
             # Telling a family who has paid in full that their balance is zero
             # invites a worried phone call, so leave them out and say how many.
-            with_dues = [s for s in recipients if s.pending_fee > 0]
-            settled = len(recipients) - len(with_dues)
-            recipients = with_dues
+            # By default those keeping up with the installment plan are left out
+            # too - a reminder is for people who are behind.
+            def needs_reminder(student):
+                if student.pending_fee <= 0:
+                    return False
+                if include_ontrack:
+                    return True
+                due = student.school_class.scheduled_due(as_of, student.total_fee)
+                return round(due - student.total_paid, 2) > 0
+
+            wanted = [s for s in recipients if needs_reminder(s)]
+            settled = len(recipients) - len(wanted)
+            recipients = wanted
             if not recipients:
                 flash(
-                    f"Nobody in {audience} has a pending balance - nothing to send.", "info"
+                    f"Nobody in {audience} is behind on the plan for "
+                    f"{as_of.strftime('%B %Y')} - nothing to send.",
+                    "info",
                 )
                 return redirect(url_for("admin.broadcast"))
 
@@ -1472,7 +1505,8 @@ def broadcast():
             flash(f"{failed} message(s) failed - see the details below.", "danger")
         if settled:
             flash(
-                f"{settled} student(s) in {audience} have paid in full and were not messaged.",
+                f"{settled} student(s) in {audience} were not messaged - either paid in full "
+                "or up to date with the installment plan.",
                 "info",
             )
         return redirect(url_for("admin.messages"))
@@ -1502,6 +1536,7 @@ def broadcast():
         pending_counts=pending_counts,
         settings=settings_obj,
         today=date.today(),
+        preset=request.args.get("kind", "custom"),
     )
 
 

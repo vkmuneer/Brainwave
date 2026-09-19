@@ -11,12 +11,12 @@
       <label class="form-label">What are you sending?</label>
       <div class="mb-2 form-check">
         <input class="form-check-input" type="radio" name="kind" id="kind_custom" value="custom"
-               checked onchange="toggleKind()">
+               {{ '' if preset == 'fee_statement' else 'checked' }} onchange="toggleKind()">
         <label class="form-check-label" for="kind_custom">A message you write</label>
       </div>
       <div class="mb-3 form-check">
         <input class="form-check-input" type="radio" name="kind" id="kind_fee" value="fee_statement"
-               onchange="toggleKind()">
+               {{ 'checked' if preset == 'fee_statement' }} onchange="toggleKind()">
         <label class="form-check-label" for="kind_fee">
           <b>Monthly fee statement</b> - course fee, discount, paid and balance, with a Pay Now link
         </label>
@@ -24,9 +24,23 @@
 
       <div id="feeOptions" class="border rounded p-3 mb-3 bg-light" hidden>
         <div class="mb-2">
-          <label class="form-label">Statement date</label>
+          <label class="form-label">Month end being billed</label>
           <input type="date" name="as_of" class="form-control" value="{{ today.isoformat() }}">
-          <div class="form-text">Usually the last day of the month you are billing for.</div>
+          <div class="form-text">
+            The message is headed with this month's name and asks for the amount the class's
+            installment plan expects by then.
+          </div>
+        </div>
+
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" name="include_ontrack" id="include_ontrack" value="1">
+          <label class="form-check-label small" for="include_ontrack">
+            Also message families who are up to date with the plan
+          </label>
+          <div class="form-text">
+            Off by default - only those behind on this month's installment are reminded.
+            Families who have paid in full are never messaged.
+          </div>
         </div>
         {% if settings.upi_id %}
         <div class="small text-muted">

@@ -48,27 +48,47 @@ def build_upi_link(upi_id: str, payee_name: str, amount: float, note: str) -> st
 
 
 def monthly_fee_statement(student, pay_url, as_of, academy_name="Brainwave Academy"):
-    """The month-end statement parents get: what the course costs, what has been
-    allowed off, what has been received, and what is still due as of a date.
+    """The month-end statement parents get, named for the month it covers.
 
     Spelled out line by line rather than as a single "you owe X", because the
     usual reply to a bare figure is a phone call asking how it was arrived at.
+    Where the class has an installment plan, the headline figure is what the
+    plan asks for by this month end - not the whole year's fee, which would
+    read as though it were all overdue.
     """
+    school_class = student.school_class
+    month_name = as_of.strftime("%B %Y")
+    due_by_now = school_class.scheduled_due(as_of, student.total_fee)
+    shortfall = round(due_by_now - student.total_paid, 2)
+
     lines = [
         f"{academy_name}",
-        f"Fee statement as on {as_of.strftime('%d-%m-%Y')}",
+        f"Fee reminder for {month_name}",
         "",
         f"Student: {student.name}",
-        f"Class: {student.school_class.name}-{student.division.name}",
+        f"Class: {school_class.name}-{student.division.name}",
         "",
-        f"Course fee: Rs. {student.class_fee:,.0f}",
+        f"Total course fee: Rs. {student.class_fee:,.0f}",
     ]
     if student.discount_amount:
-        lines.append(f"Discount: Rs. {student.discount_amount:,.0f}")
+        lines.append(f"Discount allowed: Rs. {student.discount_amount:,.0f}")
         lines.append(f"Payable: Rs. {student.total_fee:,.0f}")
+    lines.append(f"Paid so far: Rs. {student.total_paid:,.0f}")
+    lines.append("")
+
+    if school_class.has_schedule and due_by_now < student.total_fee:
+        lines.append(
+            f"Payable by {as_of.strftime('%d %B %Y')}: Rs. {due_by_now:,.0f}"
+        )
+        if shortfall > 0:
+            lines.append(f"To be paid now: Rs. {shortfall:,.0f}")
+        else:
+            lines.append("Your payments are up to date for this month. Thank you.")
+        lines.append(f"Remaining after that: Rs. {student.pending_fee - max(shortfall, 0):,.0f}")
+    else:
+        lines.append(f"Balance due: Rs. {student.pending_fee:,.0f}")
+
     lines += [
-        f"Paid so far: Rs. {student.total_paid:,.0f}",
-        f"Balance due: Rs. {student.pending_fee:,.0f}",
         "",
         f"Pay now: {pay_url}",
         "",
