@@ -47,8 +47,11 @@ def create_app(config_class=Config):
 
     @app.route("/")
     def index():
+        # A visitor gets the academy's own front page; the staff login used to
+        # sit here, which made a tuition centre's home page look like an admin
+        # tool to every parent who found it.
         if not current_user.is_authenticated:
-            return redirect(url_for("auth.login"))
+            return redirect(url_for("public.home"))
         if current_user.is_admin:
             return redirect(url_for("admin.dashboard"))
         return redirect(url_for("teacher.dashboard"))

@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{{ settings.academy_name }}{% if settings.tagline %} - {{ settings.tagline }}{% endif %}</title>
+  <meta name="description" content="{{ settings.academy_name }} - tuition for Class 9, SSLC, Plus One and Plus Two. Attendance, marks and fees online for every parent.">
+  <link rel="icon" href="{{ url_for('public.logo') }}">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --teal: #36b6a8;
+      --blue: #1c3f63;
+      --dark-teal: #155e52;
+      --ink: #14202e;
+      --muted: #5b6b7c;
+      --surface: #ffffff;
+      --wash: #f3f8f8;
+      --line: #e4ecec;
+    }
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      color: var(--ink);
+      background: var(--surface);
+      padding-bottom: 0;
+    }
+    h1, h2, h3, .display-5 { font-weight: 800; letter-spacing: -0.02em; }
+    .lead-muted { color: var(--muted); }
+
+    .bw-top {
+      position: sticky; top: 0; z-index: 1030;
+      background: rgba(255,255,255,.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--line);
+    }
+    .bw-top .brand { display: flex; align-items: center; gap: .6rem; font-weight: 800; color: var(--blue); }
+    .bw-top .brand img { height: 38px; width: 38px; }
+
+    .hero {
+      background:
+        radial-gradient(1100px 500px at 85% -10%, rgba(54,182,168,.28), transparent 60%),
+        linear-gradient(135deg, var(--blue) 0%, var(--dark-teal) 100%);
+      color: #fff;
+      padding: 5rem 0 6rem;
+      position: relative; overflow: hidden;
+    }
+    .hero::after {
+      content: ''; position: absolute; inset: auto 0 -1px 0; height: 60px;
+      background: var(--surface);
+      clip-path: polygon(0 100%, 100% 0, 100% 100%);
+    }
+    .hero .eyebrow {
+      display: inline-block; font-size: .78rem; font-weight: 600; letter-spacing: .12em;
+      text-transform: uppercase; opacity: .85;
+      border: 1px solid rgba(255,255,255,.35); border-radius: 999px; padding: .3rem .85rem;
+    }
+    .btn-solid {
+      background: #fff; color: var(--blue); font-weight: 600; border: none;
+      padding: .75rem 1.5rem; border-radius: 10px;
+    }
+    .btn-solid:hover { background: #eef7f6; color: var(--blue); }
+    .btn-ghost {
+      border: 1px solid rgba(255,255,255,.5); color: #fff; font-weight: 600;
+      padding: .75rem 1.5rem; border-radius: 10px;
+    }
+    .btn-ghost:hover { background: rgba(255,255,255,.12); color: #fff; }
+
+    section { padding: 4.5rem 0; }
+    .section-wash { background: var(--wash); }
+    .eyebrow-dark {
+      font-size: .78rem; font-weight: 700; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--teal);
+    }
+
+    .card-soft {
+      background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+      padding: 1.6rem; height: 100%;
+      transition: transform .18s ease, box-shadow .18s ease;
+    }
+    .card-soft:hover { transform: translateY(-3px); box-shadow: 0 12px 30px rgba(20,32,46,.09); }
+    .icon-chip {
+      width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center;
+      background: linear-gradient(135deg, rgba(54,182,168,.18), rgba(28,63,99,.12));
+      color: var(--dark-teal); font-size: 1.3rem; margin-bottom: .9rem;
+    }
+    .class-pill {
+      border: 1px solid var(--line); border-radius: 14px; padding: 1.2rem 1rem; text-align: center;
+      background: var(--surface); height: 100%;
+    }
+    .class-pill .name { font-size: 1.5rem; font-weight: 800; color: var(--blue); }
+
+    .stat { text-align: center; }
+    .stat .n { font-size: 2.2rem; font-weight: 800; color: var(--dark-teal); line-height: 1; }
+    .stat .l { color: var(--muted); font-size: .9rem; margin-top: .35rem; }
+
+    footer { background: var(--blue); color: rgba(255,255,255,.82); padding: 3rem 0 2rem; }
+    footer a { color: #fff; text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .card-soft { transition: none; }
+      .card-soft:hover { transform: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="bw-top">
+  <div class="container d-flex justify-content-between align-items-center py-2">
+    <a href="{{ url_for('public.home') }}" class="brand text-decoration-none">
+      <img src="{{ url_for('public.logo') }}" alt="{{ settings.academy_name }}">
+      <span>{{ settings.academy_name }}</span>
+    </a>
+    <div class="d-flex align-items-center gap-2">
+      <a href="#courses" class="btn btn-sm btn-link text-decoration-none d-none d-md-inline">Courses</a>
+      <a href="#contact" class="btn btn-sm btn-link text-decoration-none d-none d-md-inline">Contact</a>
+      <a href="{{ url_for('learn.catalogue') }}" class="btn btn-sm btn-outline-secondary">Video Courses</a>
+      <a href="{{ url_for('portal.login') if portal_open else url_for('auth.login') }}"
+         class="btn btn-sm text-white" style="background: var(--blue);">
+        {{ 'Parent Login' if portal_open else 'Staff Login' }}
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="hero">
+  <div class="container position-relative" style="z-index:2;">
+    <div class="row align-items-center g-4">
+      <div class="col-lg-7">
+        <span class="eyebrow">Class 9 &middot; SSLC &middot; Plus One &middot; Plus Two</span>
+        <h1 class="display-5 mt-3 mb-3">
+          {{ settings.tagline or 'Focused coaching, and a parent who always knows where their child stands.' }}
+        </h1>
+        <p class="lead mb-4" style="opacity:.92; max-width: 44rem;">
+          {{ settings.academy_name }} teaches the school syllabus in small divisions, tracks
+          attendance every session, and publishes marks and fees to parents online - so nothing
+          about your child's progress is a surprise at the end of term.
+        </p>
+        <div class="d-flex flex-wrap gap-2">
+          {% if portal_open %}
+          <a href="{{ url_for('portal.login') }}" class="btn btn-solid">
+            <i class="bi bi-person-check"></i> Parent &amp; Student Login
+          </a>
+          {% endif %}
+          <a href="{{ url_for('learn.catalogue') }}" class="btn btn-ghost">
+            <i class="bi bi-play-btn"></i> Browse Video Courses
+          </a>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="row g-3">
+          {% for item in highlights %}
+          <div class="col-6">
+            <div class="p-3 rounded-4 h-100" style="background: rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.18);">
+              <div class="fs-4"><i class="bi {{ item.icon }}"></i></div>
+              <div class="fw-bold mt-1">{{ item.title }}</div>
+              <div class="small" style="opacity:.85;">{{ item.text }}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section>
+  <div class="container">
+    <div class="row g-4 justify-content-center">
+      {% for s in stats %}
+      <div class="col-6 col-md-3">
+        <div class="stat">
+          <div class="n">{{ s.value }}</div>
+          <div class="l">{{ s.label }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section-wash" id="classes">
+  <div class="container">
+    <div class="eyebrow-dark">What we teach</div>
+    <h2 class="mb-2">Classes we coach</h2>
+    <p class="lead-muted mb-4" style="max-width: 46rem;">
+      Each class runs in small divisions so a teacher knows every student by name.
+    </p>
+    <div class="row g-3">
+      {% for c in classes %}
+      <div class="col-6 col-lg-3">
+        <div class="class-pill">
+          <div class="name">{{ c.name }}</div>
+          <div class="text-muted small mt-1">
+            {{ c.divisions | length }} division{{ '' if c.divisions | length == 1 else 's' }}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section id="why">
+  <div class="container">
+    <div class="eyebrow-dark">Why parents choose us</div>
+    <h2 class="mb-4">Taught closely. Reported honestly.</h2>
+    <div class="row g-4">
+      {% for f in features %}
+      <div class="col-12 col-md-6 col-lg-4">
+        <div class="card-soft">
+          <div class="icon-chip"><i class="bi {{ f.icon }}"></i></div>
+          <h5 class="mb-2">{{ f.title }}</h5>
+          <p class="lead-muted mb-0" style="font-size: .98rem;">{{ f.text }}</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section-wash" id="courses">
+  <div class="container">
+    <div class="eyebrow-dark">Learn from anywhere</div>
+    <h2 class="mb-2">Video courses</h2>
+    <p class="lead-muted mb-4" style="max-width: 46rem;">
+      Recorded subject courses you can watch at your own pace, chapter by chapter.
+    </p>
+
+    <div class="row g-3">
+      {% for c in courses %}
+      <div class="col-12 col-md-6 col-lg-4">
+        <div class="card-soft d-flex flex-column">
+          <div class="d-flex justify-content-between align-items-start">
+            <h5 class="mb-1">{{ c.title }}</h5>
+            <span class="badge text-dark" style="background: var(--wash);">{{ c.duration_label }}</span>
+          </div>
+          <div class="text-muted small">{{ c.subject_label or '' }}</div>
+          <div class="mt-auto pt-3 d-flex justify-content-between align-items-center">
+            <span class="fw-bold" style="color: var(--dark-teal);">Rs. {{ "{:,.0f}".format(c.price) }}</span>
+            <a href="{{ url_for('learn.course_detail', course_id=c.id) }}"
+               class="btn btn-sm text-white" style="background: var(--blue);">View</a>
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="col-12">
+        <div class="card-soft text-center">
+          <div class="icon-chip mx-auto"><i class="bi bi-camera-reels"></i></div>
+          <h5>Video courses are on the way</h5>
+          <p class="lead-muted mb-0">
+            Recorded lessons for each subject will appear here shortly.
+          </p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section id="contact">
+  <div class="container">
+    <div class="row g-4 align-items-center">
+      <div class="col-lg-6">
+        <div class="eyebrow-dark">Come and see us</div>
+        <h2 class="mb-3">Visit or call the academy</h2>
+        <ul class="list-unstyled lead-muted mb-0">
+          {% if settings.address %}
+          <li class="mb-2"><i class="bi bi-geo-alt me-2" style="color: var(--teal);"></i>{{ settings.address }}</li>
+          {% endif %}
+          {% if settings.phone %}
+          <li class="mb-2">
+            <i class="bi bi-telephone me-2" style="color: var(--teal);"></i>
+            <a href="tel:{{ settings.phone }}" class="text-decoration-none" style="color: inherit;">{{ settings.phone }}</a>
+          </li>
+          {% endif %}
+          {% if settings.email %}
+          <li class="mb-2">
+            <i class="bi bi-envelope me-2" style="color: var(--teal);"></i>
+            <a href="mailto:{{ settings.email }}" class="text-decoration-none" style="color: inherit;">{{ settings.email }}</a>
+          </li>
+          {% endif %}
+          {% if not settings.address and not settings.phone and not settings.email %}
+          <li class="mb-2">Contact details will be published here shortly.</li>
+          {% endif %}
+        </ul>
+      </div>
+      <div class="col-lg-6">
+        <div class="card-soft">
+          <h5 class="mb-2">Already with us?</h5>
+          <p class="lead-muted">
+            Parents can see attendance, exam marks, fee balance and class videos from any phone.
+          </p>
+          <div class="d-flex flex-wrap gap-2">
+            {% if portal_open %}
+            <a href="{{ url_for('portal.login') }}" class="btn text-white" style="background: var(--blue);">
+              Parent &amp; Student Login
+            </a>
+            {% endif %}
+            <a href="{{ url_for('auth.login') }}" class="btn btn-outline-secondary">Staff Login</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div class="row g-4">
+      <div class="col-md-6">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <img src="{{ url_for('public.logo') }}" alt="" style="height:34px;width:34px;">
+          <span class="fw-bold text-white">{{ settings.academy_name }}</span>
+        </div>
+        {% if settings.address %}<div class="small">{{ settings.address }}</div>{% endif %}
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="fw-bold text-white mb-2">Pages</div>
+        <div class="small d-grid gap-1">
+          <a href="#classes">Classes</a>
+          <a href="#courses">Video courses</a>
+          <a href="#contact">Contact</a>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="fw-bold text-white mb-2">Login</div>
+        <div class="small d-grid gap-1">
+          {% if portal_open %}<a href="{{ url_for('portal.login') }}">Parent &amp; student</a>{% endif %}
+          <a href="{{ url_for('learn.catalogue') }}">Video courses</a>
+          <a href="{{ url_for('auth.login') }}">Staff</a>
+        </div>
+      </div>
+    </div>
+    <hr style="border-color: rgba(255,255,255,.18);">
+    <div class="small">&copy; {{ today.year }} {{ settings.academy_name }}.</div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
