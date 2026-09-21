@@ -1,0 +1,40 @@
+{% extends "learn/learn_base.html" %}
+{% block title %}{{ video.title }} - {{ app_name }}{% endblock %}
+{% block content %}
+<a href="{{ url_for('learn.course_detail', course_id=course.id) }}"
+   class="btn btn-sm btn-outline-secondary mb-3">&larr; {{ course.title }}</a>
+
+<div class="card bw-card mb-3">
+  <div class="card-body">
+    <h6 class="text-bw-teal">{{ video.title }}</h6>
+    {% if video.description %}<p class="small text-muted">{{ video.description }}</p>{% endif %}
+
+    {% if video.embed_url %}
+    <div class="ratio ratio-16x9 rounded overflow-hidden">
+      <iframe src="{{ video.embed_url }}" title="{{ video.title }}" loading="lazy"
+              allow="accelerometer; encrypted-media; gyroscope; picture-in-picture"
+              allowfullscreen></iframe>
+    </div>
+    {% elif video.url %}
+    <a href="{{ video.url }}" target="_blank" rel="noopener" class="btn btn-bw-primary">
+      <i class="bi bi-play-btn"></i> Open the lecture
+    </a>
+    {% endif %}
+
+    <div class="text-muted small mt-2">
+      Licensed to {{ subscriber.name }} ({{ subscriber.mobile }}).
+      Sharing this link is a breach of your subscription.
+    </div>
+  </div>
+</div>
+
+<h6 class="text-bw-teal">All lectures</h6>
+<div class="list-group">
+  {% for v in course.videos if v.published %}
+  <a href="{{ url_for('learn.watch', course_id=course.id, video_id=v.id) }}"
+     class="list-group-item list-group-item-action {{ 'active' if v.id == video.id }}">
+    {{ loop.index }}. {{ v.title }}
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

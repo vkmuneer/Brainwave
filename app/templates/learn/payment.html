@@ -1,0 +1,42 @@
+{% extends "learn/learn_base.html" %}
+{% block title %}Payment - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="card bw-card">
+  <div class="card-body">
+    <h5 class="text-bw-teal mb-1">{{ subscription.course.title }}</h5>
+    <div class="text-muted small mb-3">Access for {{ subscription.course.duration_label }}</div>
+
+    <div class="d-flex justify-content-between border-top border-bottom py-3 mb-3">
+      <span class="fw-bold">Amount to pay</span>
+      <span class="fs-4 fw-bold text-bw-teal">Rs. {{ "{:,.0f}".format(subscription.amount) }}</span>
+    </div>
+
+    {% if upi_link %}
+    <a href="{{ upi_link }}" class="btn btn-bw-primary btn-lg w-100 mb-2">
+      <i class="bi bi-phone"></i> Pay via GPay / UPI
+    </a>
+    <p class="text-muted small">
+      Opens your UPI app with the amount filled in. On a computer, pay
+      <b>{{ settings.upi_id }}</b> from your phone instead.
+    </p>
+    {% else %}
+    <div class="alert alert-warning">
+      Online payment is not set up yet. Please contact the academy office to pay.
+    </div>
+    {% endif %}
+
+    <hr>
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="form-label">Once you have paid, tell us</label>
+      <input type="text" name="payment_note" class="form-control mb-2" maxlength="160"
+             placeholder="UPI reference number or the time you paid">
+      <button class="btn btn-outline-secondary w-100">I have paid</button>
+      <div class="form-text">
+        The academy office checks the payment and opens the course - usually the same day.
+        You will see it under My Courses.
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -686,3 +686,167 @@ class ExamMark(db.Model):
 
     def __repr__(self):
         return f"<ExamMark student={self.student_id} marks={self.marks_obtained}>"
+
+
+# ------------------------------------------------- subscription video courses
+class Subscriber(db.Model):
+    """A paying customer of the video courses.
+
+    Deliberately not a Student: no admission number, class or attendance. They
+    may never set foot in the academy. Kept apart from User as well, so a
+    customer account can never reach the staff side.
+    """
+
+    __tablename__ = "subscribers"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    mobile = db.Column(db.String(20), unique=True, nullable=False, index=True)
+    email = db.Column(db.String(120))
+    password_hash = db.Column(db.String(255), nullable=False)
+    active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    subscriptions = db.relationship(
+        "Subscription", backref="subscriber", cascade="all, delete-orphan"
+    )
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+    def subscription_for(self, course_id):
+        """Their current subscription to a course, whatever its state."""
+        rows = [s for s in self.subscriptions if s.course_id == course_id]
+        if not rows:
+            return None
+        rows.sort(key=lambda s: (s.expires_on or date.min, s.id), reverse=True)
+        return rows[0]
+
+    def can_watch(self, course_id):
+        current = self.subscription_for(course_id)
+        return bool(current and current.is_current)
+
+    def __repr__(self):
+        return f"<Subscriber {self.name} {self.mobile}>"
+
+
+class Course(db.Model):
+    """A sellable set of video lectures."""
+
+    __tablename__ = "courses"
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(150), nullable=False)
+    subject_label = db.Column(db.String(80))  # e.g. "SSLC - Mathematics"
+    description = db.Column(db.Text)
+
+    price = db.Column(db.Float, default=0, nullable=False)
+    duration_days = db.Column(db.Integer, default=30, nullable=False)
+
+    published = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    videos = db.relationship(
+        "CourseVideo",
+        backref="course",
+        cascade="all, delete-orphan",
+        order_by="CourseVideo.sequence",
+    )
+    subscriptions = db.relationship("Subscription", backref="course")
+
+    @property
+    def lecture_count(self):
+        return sum(1 for v in self.videos if v.published)
+
+    @property
+    def duration_label(self):
+        days = self.duration_days
+        if days % 365 == 0:
+            years = days // 365
+            return f"{years} year" if years == 1 else f"{years} years"
+        if days % 30 == 0:
+            months = days // 30
+            return f"{months} month" if months == 1 else f"{months} months"
+        return f"{days} days"
+
+    def __repr__(self):
+        return f"<Course {self.title}>"
+
+
+class CourseVideo(db.Model):
+    __tablename__ = "course_videos"
+
+    id = db.Column(db.Integer, primary_key=True)
+    course_id = db.Column(db.Integer, db.ForeignKey("courses.id"), nullable=False)
+
+    title = db.Column(db.String(150), nullable=False)
+    description = db.Column(db.String(500))
+    url = db.Column(db.String(500))
+    sequence = db.Column(db.Integer, default=0, nullable=False)
+    published = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    @property
+    def embed_url(self):
+        from .utils.video import embed_url_for
+
+        return embed_url_for(self.url)
+
+    def __repr__(self):
+        return f"<CourseVideo {self.title}>"
+
+
+class Subscription(db.Model):
+    """One purchase: who bought which course, and until when.
+
+    Payment is confirmed by the office rather than a gateway, so a subscription
+    sits as 'pending' until somebody checks the bank and activates it.
+    """
+
+    __tablename__ = "subscriptions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    subscriber_id = db.Column(db.Integer, db.ForeignKey("subscribers.id"), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey("courses.id"), nullable=False)
+
+    status = db.Column(db.String(10), default="pending", nullable=False)  # pending/active/rejected
+    amount = db.Column(db.Float, default=0, nullable=False)
+    payment_note = db.Column(db.String(160))  # what the subscriber says they paid
+
+    requested_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    starts_on = db.Column(db.Date)
+    expires_on = db.Column(db.Date)
+
+    activated_by = db.Column(db.String(120))
+    activated_at = db.Column(db.DateTime)
+    office_note = db.Column(db.String(255))
+
+    @property
+    def is_current(self):
+        return (
+            self.status == "active"
+            and self.expires_on is not None
+            and self.expires_on >= date.today()
+        )
+
+    @property
+    def days_left(self):
+        if not self.expires_on:
+            return None
+        return (self.expires_on - date.today()).days
+
+    @property
+    def state_label(self):
+        if self.status == "pending":
+            return "Awaiting payment confirmation"
+        if self.status == "rejected":
+            return "Not activated"
+        if self.is_current:
+            return f"Active until {self.expires_on.strftime('%d-%m-%Y')}"
+        return f"Expired on {self.expires_on.strftime('%d-%m-%Y')}" if self.expires_on else "Expired"
+
+    def __repr__(self):
+        return f"<Subscription {self.subscriber_id} course={self.course_id} {self.status}>"

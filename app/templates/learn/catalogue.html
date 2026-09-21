@@ -1,0 +1,39 @@
+{% extends "learn/learn_base.html" %}
+{% block title %}Video Courses - {{ app_name }}{% endblock %}
+{% block content %}
+<h4 class="text-bw-teal mb-1">Video Courses</h4>
+<p class="text-muted">Subject courses you can watch at your own pace.</p>
+
+<div class="row g-3">
+  {% for c in courses %}
+  <div class="col-12 col-md-6">
+    <div class="card bw-card h-100">
+      <div class="card-body d-flex flex-column">
+        <div class="d-flex justify-content-between align-items-start">
+          <h6 class="fw-bold mb-0">{{ c.title }}</h6>
+          <span class="badge bg-light text-dark border">{{ c.duration_label }}</span>
+        </div>
+        {% if c.subject_label %}
+        <div class="text-muted small">{{ c.subject_label }}</div>
+        {% endif %}
+        {% if c.description %}
+        <p class="small mt-2 mb-2">{{ c.description }}</p>
+        {% endif %}
+        <div class="text-muted small mb-3">{{ c.lecture_count }} lecture(s)</div>
+        <div class="mt-auto d-flex justify-content-between align-items-center">
+          <span class="fs-5 fw-bold text-bw-teal">Rs. {{ "{:,.0f}".format(c.price) }}</span>
+          <a href="{{ url_for('learn.course_detail', course_id=c.id) }}"
+             class="btn btn-sm btn-bw-primary">View course</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12">
+    <div class="card bw-card"><div class="card-body text-muted">
+      No courses are published yet. Please check back soon.
+    </div></div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

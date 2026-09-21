@@ -33,12 +33,14 @@ def create_app(config_class=Config):
     from .teacher.routes import teacher_bp
     from .public.routes import public_bp
     from .portal.routes import portal_bp
+    from .learn.routes import learn_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(teacher_bp)
     app.register_blueprint(public_bp)
     app.register_blueprint(portal_bp)
+    app.register_blueprint(learn_bp)
 
     from flask import redirect, url_for
     from flask_login import current_user
@@ -92,10 +94,12 @@ def create_app(config_class=Config):
         pending_resets = 0
         pending_videos = 0
         pending_feedback = 0
+        pending_subs = 0
         if current_user.is_authenticated and current_user.is_office_staff:
-            from .models import Feedback
+            from .models import Feedback, Subscription
 
             pending_feedback = Feedback.query.filter_by(status="open").count()
+            pending_subs = Subscription.query.filter_by(status="pending").count()
         if current_user.is_authenticated and current_user.is_admin:
             from .models import PasswordResetRequest, VideoClass
 
@@ -107,6 +111,7 @@ def create_app(config_class=Config):
             "pending_reset_count": pending_resets,
             "pending_video_count": pending_videos,
             "pending_feedback_count": pending_feedback,
+            "pending_subscription_count": pending_subs,
         }
 
     with app.app_context():

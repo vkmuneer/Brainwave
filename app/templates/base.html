@@ -68,6 +68,15 @@
             <li><a class="dropdown-item" href="{{ url_for('admin.class_wise_report') }}">Class-wise Summary</a></li>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item" href="{{ url_for('admin.payments_bulk_upload') }}">Bulk Payment Upload</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <a class="dropdown-item" href="{{ url_for('admin.subscriptions') }}">
+                Course Subscriptions
+                {% if pending_subscription_count %}
+                <span class="badge bg-danger rounded-pill">{{ pending_subscription_count }}</span>
+                {% endif %}
+              </a>
+            </li>
           </ul>
         </li>
 
@@ -109,6 +118,8 @@
             <li><a class="dropdown-item" href="{{ url_for('admin.office_staff') }}">Office Staff</a></li>
             <li><a class="dropdown-item" href="{{ url_for('admin.classes') }}">Classes &amp; Fee Plans</a></li>
             <li><a class="dropdown-item" href="{{ url_for('admin.masters') }}">Master Data</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{{ url_for('admin.courses') }}">Subscription Courses</a></li>
             <li><hr class="dropdown-divider"></li>
             <li>
               <a class="dropdown-item" href="{{ url_for('admin.videos') }}">

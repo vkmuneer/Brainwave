@@ -1,0 +1,64 @@
+{% extends "learn/learn_base.html" %}
+{% block title %}{{ course.title }} - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="card bw-card mb-3">
+  <div class="card-body">
+    <h5 class="text-bw-teal mb-1">{{ course.title }}</h5>
+    {% if course.subject_label %}<div class="text-muted small">{{ course.subject_label }}</div>{% endif %}
+    {% if course.description %}<p class="mt-2">{{ course.description }}</p>{% endif %}
+
+    <div class="d-flex flex-wrap gap-3 align-items-center mt-3">
+      <span class="fs-4 fw-bold text-bw-teal">Rs. {{ "{:,.0f}".format(course.price) }}</span>
+      <span class="text-muted">for {{ course.duration_label }}</span>
+      <span class="text-muted">{{ course.lecture_count }} lecture(s)</span>
+    </div>
+
+    <div class="mt-3">
+      {% if can_watch %}
+        <div class="alert alert-success mb-0">
+          <i class="bi bi-check-circle"></i> {{ subscription.state_label }}.
+          {% if subscription.days_left is not none and subscription.days_left <= 7 %}
+          <b>Only {{ subscription.days_left }} day(s) left</b> - renew to keep watching.
+          {% endif %}
+        </div>
+      {% elif subscription and subscription.status == 'pending' %}
+        <div class="alert alert-warning mb-0">
+          Waiting for the academy to confirm your payment.
+          <a href="{{ url_for('learn.payment', subscription_id=subscription.id) }}"
+             class="alert-link">See payment details</a>
+        </div>
+      {% elif subscriber %}
+        <form method="post" action="{{ url_for('learn.subscribe', course_id=course.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-bw-primary btn-lg">
+            {{ 'Renew this course' if subscription else 'Subscribe' }}
+          </button>
+        </form>
+      {% else %}
+        <a href="{{ url_for('learn.register') }}" class="btn btn-bw-primary btn-lg">Register to subscribe</a>
+        <a href="{{ url_for('learn.login') }}" class="btn btn-outline-secondary">I already have an account</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<h6 class="text-bw-teal">Lectures</h6>
+<div class="list-group mb-3">
+  {% for v in course.videos if v.published %}
+  <div class="list-group-item d-flex justify-content-between align-items-center">
+    <div>
+      <div class="fw-bold">{{ loop.index }}. {{ v.title }}</div>
+      {% if v.description %}<div class="small text-muted">{{ v.description }}</div>{% endif %}
+    </div>
+    {% if can_watch %}
+    <a href="{{ url_for('learn.watch', course_id=course.id, video_id=v.id) }}"
+       class="btn btn-sm btn-bw-primary text-nowrap">Watch</a>
+    {% else %}
+    <span class="text-muted"><i class="bi bi-lock"></i></span>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="list-group-item text-muted">No lectures published yet.</div>
+  {% endfor %}
+</div>
+{% endblock %}

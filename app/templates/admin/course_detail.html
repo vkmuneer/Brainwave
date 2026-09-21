@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}{{ course.title }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="text-bw-teal m-0">{{ course.title }}</h4>
+  <a href="{{ url_for('admin.courses') }}" class="btn btn-sm btn-outline-secondary">All courses</a>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-5">
+    <div class="card bw-card">
+      <div class="card-header bg-white fw-bold text-bw-teal">Course details</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('admin.course_form', course_id=course.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="mb-2">
+            <label class="form-label">Title</label>
+            <input type="text" name="title" class="form-control" value="{{ course.title }}" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Subject label</label>
+            <input type="text" name="subject_label" class="form-control" value="{{ course.subject_label or '' }}">
+          </div>
+          <div class="row g-2">
+            <div class="col-6 mb-2">
+              <label class="form-label">Price (Rs.)</label>
+              <input type="number" name="price" class="form-control" min="0" step="1"
+                     value="{{ course.price | int }}">
+            </div>
+            <div class="col-6 mb-2">
+              <label class="form-label">Access days</label>
+              <input type="number" name="duration_days" class="form-control" min="1"
+                     value="{{ course.duration_days }}">
+            </div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Description</label>
+            <textarea name="description" class="form-control" rows="3">{{ course.description or '' }}</textarea>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="published" id="pub2" value="1"
+                   {{ 'checked' if course.published }}>
+            <label class="form-check-label" for="pub2">Published on the public site</label>
+          </div>
+          <button class="btn btn-bw-primary">Save</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-7">
+    <div class="card bw-card mb-3">
+      <div class="card-header bg-white fw-bold text-bw-teal">Add a lecture</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('admin.course_video_add', course_id=course.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="row g-2">
+            <div class="col-12 col-sm-8 mb-2">
+              <label class="form-label">Title</label>
+              <input type="text" name="title" class="form-control" required>
+            </div>
+            <div class="col-12 col-sm-4 mb-2">
+              <label class="form-label">Order</label>
+              <input type="number" name="sequence" class="form-control" min="1"
+                     placeholder="next">
+            </div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Video link</label>
+            <input type="url" name="url" class="form-control" required
+                   placeholder="https://vimeo.com/... or https://youtu.be/...">
+            <div class="form-text">
+              Vimeo links can be locked to your own domain, which matters for paid content.
+            </div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Notes <span class="text-muted">(optional)</span></label>
+            <input type="text" name="description" class="form-control" maxlength="500">
+          </div>
+          <button class="btn btn-bw-primary btn-sm"><i class="bi bi-plus-lg"></i> Add lecture</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card bw-card">
+      <div class="card-header bg-white fw-bold text-bw-teal">
+        Lectures ({{ course.videos | length }})
+      </div>
+      <ul class="list-group list-group-flush">
+        {% for v in course.videos %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <div class="fw-bold">{{ v.sequence }}. {{ v.title }}</div>
+            <div class="small text-muted">
+              <a href="{{ v.url }}" target="_blank" rel="noopener">{{ v.url[:60] }}</a>
+              {% if not v.embed_url %}
+              <span class="badge bg-warning text-dark">opens in a new tab</span>
+              {% endif %}
+            </div>
+          </div>
+          <form method="post" action="{{ url_for('admin.course_video_delete', video_id=v.id) }}"
+                onsubmit="return confirm('Remove this lecture?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-danger">Remove</button>
+          </form>
+        </li>
+        {% else %}
+        <li class="list-group-item text-muted">No lectures yet.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

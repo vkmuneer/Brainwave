@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Subscriptions{% endblock %}
+{% block content %}
+<h4 class="text-bw-teal mb-1"><i class="bi bi-credit-card"></i> Course Subscriptions</h4>
+<p class="text-muted small">
+  Someone subscribes, pays by UPI, and says they have paid. Check the payment reached your
+  account, then activate - access runs from the day you activate, not the day they asked.
+</p>
+
+<ul class="nav nav-pills mb-3">
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if show == 'pending' }}"
+       href="{{ url_for('admin.subscriptions', show='pending') }}">
+      Awaiting payment
+      {% if pending_total %}<span class="badge bg-danger rounded-pill">{{ pending_total }}</span>{% endif %}
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if show == 'active' }}"
+       href="{{ url_for('admin.subscriptions', show='active') }}">Active</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if show == 'all' }}"
+       href="{{ url_for('admin.subscriptions', show='all') }}">All</a>
+  </li>
+</ul>
+
+<div class="row g-3">
+  {% for s in rows %}
+  <div class="col-12 col-lg-6">
+    <div class="card bw-card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="fw-bold">{{ s.subscriber.name }}</div>
+            <div class="text-muted small">{{ s.subscriber.mobile }}</div>
+          </div>
+          <span class="badge {{ 'bg-success' if s.is_current else ('bg-warning text-dark' if s.status == 'pending' else 'bg-secondary') }}">
+            {{ s.state_label }}
+          </span>
+        </div>
+
+        <div class="mt-2">
+          <div class="fw-bold text-bw-teal">{{ s.course.title }}</div>
+          <div class="small text-muted">
+            Rs. {{ "{:,.0f}".format(s.amount) }} &middot; {{ s.course.duration_label }} &middot;
+            asked {{ s.requested_at.strftime('%d-%m-%Y %I:%M %p') }}
+          </div>
+          {% if s.payment_note %}
+          <div class="small mt-1">They said: <b>{{ s.payment_note }}</b></div>
+          {% endif %}
+          {% if s.activated_by %}
+          <div class="small text-muted mt-1">Handled by {{ s.activated_by }}</div>
+          {% endif %}
+        </div>
+
+        {% if s.status == 'pending' %}
+        <form method="post" action="{{ url_for('admin.subscription_decide', subscription_id=s.id) }}"
+              class="mt-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="text" name="office_note" class="form-control form-control-sm mb-2"
+                 maxlength="255" placeholder="Note for the subscriber (optional)">
+          <button name="decision" value="activate" class="btn btn-sm btn-bw-primary">
+            Payment received - activate
+          </button>
+          <button name="decision" value="reject" class="btn btn-sm btn-outline-danger">
+            Not received
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12"><p class="text-muted">Nothing here.</p></div>
+  {% endfor %}
+</div>
+{% endblock %}

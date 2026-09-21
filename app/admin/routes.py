@@ -38,6 +38,9 @@ from ..models import (
     AuditLog,
     Branch,
     Feedback,
+    Course,
+    CourseVideo,
+    Subscription,
 )
 from ..utils.decorators import admin_required, office_required
 from ..utils.scope import (
@@ -69,6 +72,7 @@ from ..utils.excel import (
 )
 from ..utils.pdf import render_pdf
 from ..utils.exam_analysis import compute_exam_results, build_report_context, student_progress
+from ..utils.video import is_acceptable_link
 
 
 def _pdf_response(template_name, filename, **context):
@@ -2430,3 +2434,146 @@ def exam_report_card_pdf(exam_id, student_id):
         student=student,
         result=result,
     )
+
+
+# ------------------------------------------------- subscription video courses
+@admin_bp.route("/courses")
+@login_required
+@admin_required
+def courses():
+    return render_template(
+        "admin/courses.html",
+        courses=Course.query.order_by(Course.title).all(),
+    )
+
+
+@admin_bp.route("/courses/new", methods=["POST"])
+@admin_bp.route("/courses/<int:course_id>/edit", methods=["POST"])
+@login_required
+@admin_required
+def course_form(course_id=None):
+    course = Course.query.get_or_404(course_id) if course_id else Course()
+    title = request.form.get("title", "").strip()
+    if not title:
+        flash("A course needs a title.", "danger")
+        return redirect(url_for("admin.courses"))
+
+    course.title = title
+    course.subject_label = request.form.get("subject_label", "").strip()
+    course.description = request.form.get("description", "").strip()
+    course.price = max(request.form.get("price", type=float) or 0, 0)
+    course.duration_days = max(request.form.get("duration_days", type=int) or 30, 1)
+    course.published = bool(request.form.get("published"))
+
+    if course_id is None:
+        db.session.add(course)
+    db.session.commit()
+    flash(f'"{course.title}" saved.', "success")
+    return redirect(url_for("admin.course_detail", course_id=course.id))
+
+
+@admin_bp.route("/courses/<int:course_id>")
+@login_required
+@admin_required
+def course_detail(course_id):
+    course = Course.query.get_or_404(course_id)
+    return render_template("admin/course_detail.html", course=course)
+
+
+@admin_bp.route("/courses/<int:course_id>/videos/add", methods=["POST"])
+@login_required
+@admin_required
+def course_video_add(course_id):
+    course = Course.query.get_or_404(course_id)
+    title = request.form.get("title", "").strip()
+    url = request.form.get("url", "").strip()
+
+    if not title or not url:
+        flash("A lecture needs a title and a link.", "danger")
+    elif not is_acceptable_link(url):
+        flash("The link must start with http:// or https://", "danger")
+    else:
+        next_seq = max([v.sequence for v in course.videos], default=0) + 1
+        db.session.add(
+            CourseVideo(
+                course_id=course.id,
+                title=title,
+                url=url,
+                description=request.form.get("description", "").strip()[:500],
+                sequence=request.form.get("sequence", type=int) or next_seq,
+            )
+        )
+        db.session.commit()
+        flash(f'"{title}" added.', "success")
+    return redirect(url_for("admin.course_detail", course_id=course.id))
+
+
+@admin_bp.route("/courses/videos/<int:video_id>/delete", methods=["POST"])
+@login_required
+@admin_required
+def course_video_delete(video_id):
+    video = CourseVideo.query.get_or_404(video_id)
+    course_id = video.course_id
+    db.session.delete(video)
+    db.session.commit()
+    flash("Lecture removed.", "info")
+    return redirect(url_for("admin.course_detail", course_id=course_id))
+
+
+@admin_bp.route("/subscriptions")
+@login_required
+@office_required
+def subscriptions():
+    show = request.args.get("show", "pending")
+    query = Subscription.query
+    if show == "pending":
+        query = query.filter_by(status="pending")
+    elif show == "active":
+        query = query.filter(Subscription.status == "active")
+
+    rows = query.order_by(Subscription.requested_at.desc()).limit(200).all()
+    if show == "active":
+        rows = [r for r in rows if r.is_current]
+
+    return render_template(
+        "admin/subscriptions.html",
+        rows=rows,
+        show=show,
+        pending_total=Subscription.query.filter_by(status="pending").count(),
+    )
+
+
+@admin_bp.route("/subscriptions/<int:subscription_id>/decide", methods=["POST"])
+@login_required
+@office_required
+def subscription_decide(subscription_id):
+    subscription = Subscription.query.get_or_404(subscription_id)
+    decision = request.form.get("decision")
+    if decision not in ("activate", "reject"):
+        abort(400)
+
+    subscription.office_note = request.form.get("office_note", "").strip()[:255]
+    subscription.activated_by = current_user.name
+    subscription.activated_at = datetime.utcnow()
+
+    if decision == "activate":
+        # Runs from today rather than the request date, so a subscriber does not
+        # lose the days spent waiting for the office to check the bank.
+        subscription.status = "active"
+        subscription.starts_on = date.today()
+        subscription.expires_on = date.today() + timedelta(
+            days=subscription.course.duration_days
+        )
+        db.session.commit()
+        flash(
+            f"{subscription.subscriber.name} now has access to "
+            f"{subscription.course.title} until "
+            f"{subscription.expires_on.strftime('%d-%m-%Y')}.",
+            "success",
+        )
+    else:
+        subscription.status = "rejected"
+        db.session.commit()
+        flash("Marked as not activated. The subscriber will see your note.", "info")
+
+    return redirect(url_for("admin.subscriptions"))

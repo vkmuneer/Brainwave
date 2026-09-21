@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Video Courses{% endblock %}
+{% block content %}
+<h4 class="text-bw-teal mb-1"><i class="bi bi-collection-play"></i> Subscription Courses</h4>
+<p class="text-muted small">
+  Courses sold on the public site at <code>/learn</code>. A course is only visible there
+  once you publish it.
+</p>
+
+<div class="card bw-card mb-4" style="max-width: 640px;">
+  <div class="card-body">
+    <h6 class="text-bw-teal">Add a course</h6>
+    <form method="post" action="{{ url_for('admin.course_form') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="row g-2">
+        <div class="col-12 col-sm-7 mb-2">
+          <label class="form-label">Title</label>
+          <input type="text" name="title" class="form-control" required placeholder="SSLC Mathematics">
+        </div>
+        <div class="col-12 col-sm-5 mb-2">
+          <label class="form-label">Subject label</label>
+          <input type="text" name="subject_label" class="form-control" placeholder="SSLC - Mathematics">
+        </div>
+        <div class="col-6 col-sm-4 mb-2">
+          <label class="form-label">Price (Rs.)</label>
+          <input type="number" name="price" class="form-control" min="0" step="1" value="0">
+        </div>
+        <div class="col-6 col-sm-4 mb-2">
+          <label class="form-label">Access days</label>
+          <input type="number" name="duration_days" class="form-control" min="1" value="30">
+        </div>
+        <div class="col-12 mb-2">
+          <label class="form-label">Description</label>
+          <textarea name="description" class="form-control" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" name="published" id="pub" value="1">
+        <label class="form-check-label" for="pub">Publish it on the public site</label>
+      </div>
+      <button class="btn btn-bw-primary"><i class="bi bi-plus-lg"></i> Create course</button>
+    </form>
+  </div>
+</div>
+
+<div class="row g-3">
+  {% for c in courses %}
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="card bw-card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <h6 class="fw-bold mb-0">{{ c.title }}</h6>
+          <span class="badge {{ 'bg-success' if c.published else 'bg-secondary' }}">
+            {{ 'Published' if c.published else 'Draft' }}
+          </span>
+        </div>
+        <div class="text-muted small">{{ c.subject_label or '' }}</div>
+        <div class="small mt-2">
+          Rs. {{ "{:,.0f}".format(c.price) }} &middot; {{ c.duration_label }} &middot;
+          {{ c.lecture_count }} lecture(s)
+        </div>
+        <div class="small text-muted">
+          {{ c.subscriptions | selectattr('is_current') | list | length }} active subscriber(s)
+        </div>
+        <a href="{{ url_for('admin.course_detail', course_id=c.id) }}"
+           class="btn btn-sm btn-outline-secondary mt-2">Manage</a>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12"><p class="text-muted">No courses yet.</p></div>
+  {% endfor %}
+</div>
+{% endblock %}
