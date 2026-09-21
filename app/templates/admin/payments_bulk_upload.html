@@ -6,23 +6,38 @@
 <div class="card bw-card" style="max-width: 640px;">
   <div class="card-body">
     <p class="text-muted small">
-      Record a day's collection in one go. The sheet lists every student who still owes
-      something, with their balance; type the amount received against each and upload it back.
-      Receipt numbers are generated automatically.
+      One row per student, with a column for each installment they paid. The sheet lists
+      everyone who still owes something, along with their course fee, discount, paid so far
+      and balance for reference. Receipt numbers are generated automatically.
     </p>
 
     <form method="get" action="{{ url_for('admin.payments_bulk_template') }}"
-          class="d-flex gap-2 mb-4">
-      <select name="class_id" class="form-select">
-        <option value="">All classes</option>
-        {% for c in classes %}
-        <option value="{{ c.id }}">Class {{ c.name }}</option>
-        {% endfor %}
-      </select>
-      <button class="btn btn-outline-secondary text-nowrap">
-        <i class="bi bi-download"></i> Download sheet
-      </button>
+          class="row g-2 mb-4">
+      <div class="col-12 col-sm-5">
+        <label class="form-label small mb-0">Class</label>
+        <select name="class_id" class="form-select">
+          <option value="">All classes</option>
+          {% for c in classes %}
+          <option value="{{ c.id }}">Class {{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-sm-3">
+        <label class="form-label small mb-0">Installment columns</label>
+        <input type="number" name="installments" class="form-control" min="1" max="12" value="6">
+      </div>
+      <div class="col-6 col-sm-4 d-flex align-items-end">
+        <button class="btn btn-outline-secondary w-100 text-nowrap">
+          <i class="bi bi-download"></i> Download sheet
+        </button>
+      </div>
     </form>
+
+    <div class="small text-muted mb-3">
+      Each row reads like:
+      <code>admission_no · name · class · course_fee · discount · paid_so_far · balance_due ·
+      installment_1 · date_1 · mode_1 · installment_2 · date_2 · mode_2 · …</code>
+    </div>
 
     <hr>
 
@@ -36,8 +51,9 @@
         </button>
       </div>
       <div class="form-text">
-        Rows with no amount are skipped. A payment larger than the student's balance is
-        rejected and reported, so a typo cannot create a credit.
+        Blank installments are skipped. The installments on a row cannot add up to more than
+        that student's balance, and a payment identical to one already recorded is not added
+        twice - so re-uploading the same sheet is safe.
       </div>
     </form>
   </div>

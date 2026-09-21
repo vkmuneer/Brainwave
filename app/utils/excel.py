@@ -5,6 +5,7 @@ parent_whatsapp) so office staff can fill a sheet quickly; everything else
 is optional and defaults sensibly, matching the single-student add form.
 """
 import io
+import re
 
 import openpyxl
 from openpyxl.styles import Font
@@ -232,57 +233,71 @@ def parse_marks_upload(file_stream):
 
 # ------------------------------------------------ bulk fee payment import
 PAYMENTS_SHEET = "Payments"
-PAYMENT_FIELDS = ["admission_no", "amount", "payment_date", "mode", "remarks"]
+INSTALLMENT_PATTERN = re.compile(r"^installment_(\d+)$")
+DATE_PATTERN = re.compile(r"^date_(\d+)$")
+MODE_PATTERN = re.compile(r"^mode_(\d+)$")
 
 
-def build_payments_template(students):
-    """A sheet listing every student with their current balance, ready for the
-    office to type in what each has paid."""
+def build_payments_template(students, installments=6):
+    """One row per student, with several installment columns.
+
+    A family usually pays in parts across the year, so a sheet of one payment
+    per row would mean hunting for the same student several times. Here each
+    student appears once and their payments run across the row.
+    """
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = PAYMENTS_SHEET
 
-    headers = [
-        "admission_no*", "name", "class", "balance_due",
-        "amount*", "payment_date (YYYY-MM-DD)", "mode", "remarks",
-    ]
+    headers = ["admission_no*", "name", "class", "course_fee", "discount", "paid_so_far", "balance_due"]
+    for n in range(1, installments + 1):
+        headers += [f"installment_{n}", f"date_{n}", f"mode_{n}"]
+
     ws.append(headers)
     for cell in ws[1]:
         cell.font = Font(bold=True)
 
     for student in students:
-        ws.append(
-            [
-                student.admission_no,
-                student.name,
-                f"{student.school_class.name}-{student.division.name}",
-                student.pending_fee,
-                None,
-                None,
-                None,
-                None,
-            ]
-        )
+        row = [
+            student.admission_no,
+            student.name,
+            f"{student.school_class.name}-{student.division.name}",
+            student.class_fee,
+            student.discount_amount or 0,
+            student.total_paid,
+            student.pending_fee,
+        ]
+        row += [None] * (installments * 3)
+        ws.append(row)
 
     for i, header in enumerate(headers, start=1):
-        ws.column_dimensions[get_column_letter(i)].width = max(14, len(header) + 2)
-    ws.freeze_panes = "E2"
+        ws.column_dimensions[get_column_letter(i)].width = max(13, len(header) + 2)
+    ws.freeze_panes = "H2"
 
     info = wb.create_sheet("Instructions")
     info.append(["How to fill this sheet"])
     info[1][0].font = Font(bold=True)
     for line in [
         "",
-        "Type the amount received under 'amount'. Leave the row blank to skip that student.",
-        "payment_date defaults to today if left blank. Use YYYY-MM-DD.",
-        "mode is Cash, UPI, Bank Transfer or Cheque - defaults to Cash.",
-        "A payment larger than the student's balance is rejected and reported back.",
-        "Do not change admission_no - it identifies the student.",
-        "balance_due is shown for reference only; it is not read back.",
-        "Receipt numbers are generated automatically.",
+        "Each student has one row. Enter each payment they made in its own installment column.",
+        "",
+        "installment_1 / date_1 / mode_1  - the first payment and when it was made",
+        "installment_2 / date_2 / mode_2  - the second, and so on across the row",
+        "",
+        "Leave a pair blank if there was no such payment.",
+        "Dates are YYYY-MM-DD; blank means today.",
+        "mode is Cash, UPI, Bank Transfer or Cheque - blank means Cash.",
+        "",
+        "course_fee, discount, paid_so_far and balance_due are shown for reference only;",
+        "they are not read back, so changing them does nothing.",
+        "",
+        "The installments on a row must not add up to more than that student's balance.",
+        "A payment identical to one already recorded (same student, amount and date) is",
+        "skipped, so uploading the same sheet twice does not double the collection.",
+        "Need more columns? Add installment_7 / date_7 / mode_7 and so on - they are read.",
     ]:
         info.append([line])
-    info.column_dimensions["A"].width = 76
+    info.column_dimensions["A"].width = 84
 
     buffer = io.BytesIO()
     wb.save(buffer)
@@ -291,7 +306,11 @@ def build_payments_template(students):
 
 
 def parse_payments_upload(file_stream):
-    """Rows from a filled payments sheet, skipping any with no amount."""
+    """Rows of {admission_no, payments: [{n, amount, date, mode}]}.
+
+    Installment columns are discovered by name, so a sheet with extra columns
+    added by hand is read the same as the downloaded one.
+    """
     try:
         wb = openpyxl.load_workbook(file_stream, data_only=True)
     except Exception as exc:  # noqa: BLE001 - surface as a friendly upload error
@@ -304,18 +323,55 @@ def parse_payments_upload(file_stream):
     except StopIteration:
         return []
     headers = [_normalize_header(h) for h in header_row]
+
     if "admission_no" not in headers:
         raise ValueError("The sheet has no admission_no column - use the downloaded template.")
+    admission_col = headers.index("admission_no")
+
+    amounts, dates, modes = {}, {}, {}
+    for index, header in enumerate(headers):
+        for pattern, target in (
+            (INSTALLMENT_PATTERN, amounts),
+            (DATE_PATTERN, dates),
+            (MODE_PATTERN, modes),
+        ):
+            match = pattern.match(header or "")
+            if match:
+                target[int(match.group(1))] = index
+
+    if not amounts:
+        raise ValueError(
+            "The sheet has no installment_1 column - use the downloaded template."
+        )
 
     rows = []
     for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
         if row is None or all(cell in (None, "") for cell in row):
             continue
-        record = {"_row": row_idx}
-        for header, value in zip(headers, row):
-            if header in PAYMENT_FIELDS:
-                record[header] = value
-        if record.get("amount") in (None, ""):
-            continue  # nothing paid for this student
-        rows.append(record)
+
+        def cell(index):
+            return row[index] if index is not None and index < len(row) else None
+
+        admission_no = cell(admission_col)
+        if admission_no in (None, ""):
+            continue
+
+        payments = []
+        for n in sorted(amounts):
+            amount = cell(amounts.get(n))
+            if amount in (None, ""):
+                continue
+            payments.append(
+                {
+                    "n": n,
+                    "amount": amount,
+                    "date": cell(dates.get(n)),
+                    "mode": cell(modes.get(n)),
+                }
+            )
+
+        if payments:
+            rows.append(
+                {"_row": row_idx, "admission_no": str(admission_no).strip(), "payments": payments}
+            )
     return rows

@@ -1300,7 +1300,7 @@ def payments_bulk_upload():
             for s in limit_students(Student.query.filter_by(active=True)).all()
         }
 
-        saved = 0
+        saved = skipped = 0
         total = 0.0
         errors = []
 
@@ -1311,62 +1311,86 @@ def payments_bulk_upload():
                 errors.append(f"Row {row['_row']}: no active student {admission_no}.")
                 continue
 
-            try:
-                amount = float(row["amount"])
-            except (TypeError, ValueError):
-                errors.append(f"Row {row['_row']}: '{row['amount']}' is not an amount.")
-                continue
-            if amount <= 0:
-                errors.append(f"Row {row['_row']}: amount must be more than zero.")
-                continue
-            # The single-payment form refuses overpayment; the sheet must too,
-            # or a typo silently creates a credit nobody reconciles.
-            if amount > student.pending_fee:
-                errors.append(
-                    f"Row {row['_row']}: {student.name} owes only "
-                    f"Rs. {student.pending_fee:,.0f} - Rs. {amount:,.0f} rejected."
+            # Track the balance across this row: three installments of 2,000
+            # against a 5,000 balance must not all go through.
+            remaining = student.pending_fee
+            existing = {
+                (round(p.amount, 2), p.payment_date) for p in student.payments
+            }
+
+            for entry in row["payments"]:
+                label = f"Row {row['_row']} installment {entry['n']}"
+
+                try:
+                    amount = float(entry["amount"])
+                except (TypeError, ValueError):
+                    errors.append(f"{label}: '{entry['amount']}' is not an amount.")
+                    continue
+                if amount <= 0:
+                    errors.append(f"{label}: amount must be more than zero.")
+                    continue
+
+                raw_date = entry.get("date")
+                try:
+                    if isinstance(raw_date, datetime):
+                        paid_on = raw_date.date()
+                    elif isinstance(raw_date, date):
+                        paid_on = raw_date
+                    elif raw_date:
+                        paid_on = datetime.strptime(str(raw_date).strip()[:10], "%Y-%m-%d").date()
+                    else:
+                        paid_on = date.today()
+                except ValueError:
+                    errors.append(f"{label}: '{raw_date}' is not a date (use YYYY-MM-DD).")
+                    continue
+
+                # Re-uploading a sheet is a realistic mistake; without this it
+                # would double every payment on it.
+                if (round(amount, 2), paid_on) in existing:
+                    skipped += 1
+                    continue
+
+                if amount > remaining:
+                    errors.append(
+                        f"{label}: only Rs. {remaining:,.0f} left on {student.name}'s balance "
+                        f"- Rs. {amount:,.0f} rejected."
+                    )
+                    continue
+
+                mode = (str(entry.get("mode") or "Cash")).strip() or "Cash"
+                payment = FeePayment(
+                    student_id=student.id,
+                    amount=amount,
+                    payment_date=paid_on,
+                    mode=mode,
+                    remarks="Bulk upload",
+                    recorded_by=current_user.name,
                 )
-                continue
+                db.session.add(payment)
+                db.session.flush()
+                payment.receipt_no = f"BW{payment.id:05d}"
 
-            raw_date = row.get("payment_date")
-            try:
-                if isinstance(raw_date, datetime):
-                    paid_on = raw_date.date()
-                elif isinstance(raw_date, date):
-                    paid_on = raw_date
-                elif raw_date:
-                    paid_on = datetime.strptime(str(raw_date).strip()[:10], "%Y-%m-%d").date()
-                else:
-                    paid_on = date.today()
-            except ValueError:
-                errors.append(f"Row {row['_row']}: '{raw_date}' is not a date (use YYYY-MM-DD).")
-                continue
-
-            mode = (str(row.get("mode") or "Cash")).strip() or "Cash"
-            payment = FeePayment(
-                student_id=student.id,
-                amount=amount,
-                payment_date=paid_on,
-                mode=mode,
-                remarks=(str(row.get("remarks") or "")).strip()[:255],
-                recorded_by=current_user.name,
-            )
-            db.session.add(payment)
-            db.session.flush()
-            payment.receipt_no = f"BW{payment.id:05d}"
-            saved += 1
-            total += amount
+                existing.add((round(amount, 2), paid_on))
+                remaining -= amount
+                saved += 1
+                total += amount
 
         db.session.commit()
 
         if saved:
             flash(f"Recorded {saved} payment(s) totalling Rs. {total:,.0f}.", "success")
+        if skipped:
+            flash(
+                f"{skipped} payment(s) were already recorded with the same amount and date, "
+                "so they were not added again.",
+                "info",
+            )
         for message in errors[:12]:
             flash(message, "warning")
         if len(errors) > 12:
             flash(f"...and {len(errors) - 12} more problem(s) not shown.", "warning")
-        if not saved and not errors:
-            flash("Nothing to record - no amounts were filled in.", "info")
+        if not saved and not errors and not skipped:
+            flash("Nothing to record - no installments were filled in.", "info")
         return redirect(url_for("admin.payments_bulk_upload"))
 
     return render_template("admin/payments_bulk_upload.html", classes=_classes_sorted())
@@ -1382,8 +1406,9 @@ def payments_bulk_template():
         ensure_class_visible(class_id)
         query = query.filter_by(class_id=class_id)
 
+    installments = min(max(request.args.get("installments", type=int) or 6, 1), 12)
     students = [s for s in query.order_by(Student.name).all() if s.pending_fee > 0]
-    buffer = build_payments_template(students)
+    buffer = build_payments_template(students, installments)
     return send_file(
         buffer,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
