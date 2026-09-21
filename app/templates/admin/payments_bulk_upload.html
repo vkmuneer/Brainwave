@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Bulk Payment Upload{% endblock %}
+{% block content %}
+<h4 class="text-bw-teal mb-3"><i class="bi bi-cash-coin"></i> Bulk Payment Upload</h4>
+
+<div class="card bw-card" style="max-width: 640px;">
+  <div class="card-body">
+    <p class="text-muted small">
+      Record a day's collection in one go. The sheet lists every student who still owes
+      something, with their balance; type the amount received against each and upload it back.
+      Receipt numbers are generated automatically.
+    </p>
+
+    <form method="get" action="{{ url_for('admin.payments_bulk_template') }}"
+          class="d-flex gap-2 mb-4">
+      <select name="class_id" class="form-select">
+        <option value="">All classes</option>
+        {% for c in classes %}
+        <option value="{{ c.id }}">Class {{ c.name }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-outline-secondary text-nowrap">
+        <i class="bi bi-download"></i> Download sheet
+      </button>
+    </form>
+
+    <hr>
+
+    <form method="post" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="form-label">Upload the filled sheet</label>
+      <div class="d-flex gap-2">
+        <input type="file" name="file" class="form-control" accept=".xlsx" required>
+        <button class="btn btn-bw-primary text-nowrap">
+          <i class="bi bi-upload"></i> Record payments
+        </button>
+      </div>
+      <div class="form-text">
+        Rows with no amount are skipped. A payment larger than the student's balance is
+        rejected and reported, so a typo cannot create a credit.
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

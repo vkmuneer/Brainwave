@@ -38,6 +38,10 @@
           <a class="nav-link text-white px-2 {{ 'fw-bold text-decoration-underline' if request.endpoint == 'portal.videos' }}"
              href="{{ url_for('portal.videos', student_id=student.id) }}">Videos</a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link text-white px-2 {{ 'fw-bold text-decoration-underline' if request.endpoint == 'portal.feedback' }}"
+             href="{{ url_for('portal.feedback', student_id=student.id) }}">Contact</a>
+        </li>
       </ul>
       <a class="nav-link text-white" href="{{ url_for('portal.logout') }}">
         <i class="bi bi-box-arrow-right"></i> Logout
@@ -86,6 +90,8 @@
      class="{{ 'active' if request.endpoint and request.endpoint.startswith('portal.marks') }}"><i class="bi bi-journal-text"></i>Marks</a>
   <a href="{{ url_for('portal.videos', student_id=student.id) }}"
      class="{{ 'active' if request.endpoint == 'portal.videos' }}"><i class="bi bi-play-btn"></i>Videos</a>
+  <a href="{{ url_for('portal.feedback', student_id=student.id) }}"
+     class="{{ 'active' if request.endpoint == 'portal.feedback' }}"><i class="bi bi-chat-dots"></i>Contact</a>
 </nav>
 {% endif %}
 

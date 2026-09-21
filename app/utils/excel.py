@@ -228,3 +228,94 @@ def parse_marks_upload(file_stream):
             {"_row": row_idx, "admission_no": str(admission_no).strip(), "marks": marks}
         )
     return rows, list(subject_columns.values())
+
+
+# ------------------------------------------------ bulk fee payment import
+PAYMENTS_SHEET = "Payments"
+PAYMENT_FIELDS = ["admission_no", "amount", "payment_date", "mode", "remarks"]
+
+
+def build_payments_template(students):
+    """A sheet listing every student with their current balance, ready for the
+    office to type in what each has paid."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = PAYMENTS_SHEET
+
+    headers = [
+        "admission_no*", "name", "class", "balance_due",
+        "amount*", "payment_date (YYYY-MM-DD)", "mode", "remarks",
+    ]
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+
+    for student in students:
+        ws.append(
+            [
+                student.admission_no,
+                student.name,
+                f"{student.school_class.name}-{student.division.name}",
+                student.pending_fee,
+                None,
+                None,
+                None,
+                None,
+            ]
+        )
+
+    for i, header in enumerate(headers, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = max(14, len(header) + 2)
+    ws.freeze_panes = "E2"
+
+    info = wb.create_sheet("Instructions")
+    info.append(["How to fill this sheet"])
+    info[1][0].font = Font(bold=True)
+    for line in [
+        "",
+        "Type the amount received under 'amount'. Leave the row blank to skip that student.",
+        "payment_date defaults to today if left blank. Use YYYY-MM-DD.",
+        "mode is Cash, UPI, Bank Transfer or Cheque - defaults to Cash.",
+        "A payment larger than the student's balance is rejected and reported back.",
+        "Do not change admission_no - it identifies the student.",
+        "balance_due is shown for reference only; it is not read back.",
+        "Receipt numbers are generated automatically.",
+    ]:
+        info.append([line])
+    info.column_dimensions["A"].width = 76
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+
+def parse_payments_upload(file_stream):
+    """Rows from a filled payments sheet, skipping any with no amount."""
+    try:
+        wb = openpyxl.load_workbook(file_stream, data_only=True)
+    except Exception as exc:  # noqa: BLE001 - surface as a friendly upload error
+        raise ValueError(f"Not a valid Excel (.xlsx) file: {exc}") from exc
+
+    ws = wb[PAYMENTS_SHEET] if PAYMENTS_SHEET in wb.sheetnames else wb.worksheets[0]
+
+    try:
+        header_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
+    except StopIteration:
+        return []
+    headers = [_normalize_header(h) for h in header_row]
+    if "admission_no" not in headers:
+        raise ValueError("The sheet has no admission_no column - use the downloaded template.")
+
+    rows = []
+    for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        if row is None or all(cell in (None, "") for cell in row):
+            continue
+        record = {"_row": row_idx}
+        for header, value in zip(headers, row):
+            if header in PAYMENT_FIELDS:
+                record[header] = value
+        if record.get("amount") in (None, ""):
+            continue  # nothing paid for this student
+        rows.append(record)
+    return rows

@@ -1,0 +1,62 @@
+{% extends "portal/portal_base.html" %}
+{% block title %}Message the Office - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="card bw-card mb-3">
+  <div class="card-body">
+    <h6 class="text-bw-teal">Message the academy office</h6>
+    <p class="text-muted small">
+      Send a question, a request or a complaint about {{ student.name }}. The office will
+      reply here, and you will see the reply on this page.
+    </p>
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-2">
+        <label class="form-label">What is it about?</label>
+        <select name="subject" class="form-select">
+          {% for s in subjects %}
+          <option value="{{ s }}">{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Your message</label>
+        <textarea name="message" class="form-control" rows="4" maxlength="2000" required
+                  placeholder="Type your message here"></textarea>
+      </div>
+      <button class="btn btn-bw-primary w-100">
+        <i class="bi bi-send"></i> Send to the office
+      </button>
+    </form>
+  </div>
+</div>
+
+<h6 class="text-bw-teal">Your earlier messages</h6>
+{% for t in threads %}
+<div class="card bw-card mb-2">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start">
+      <span class="badge bg-light text-dark border">{{ t.subject }}</span>
+      <span class="badge {{ 'bg-success' if t.status == 'answered' else 'bg-warning text-dark' }}">
+        {{ 'Replied' if t.status == 'answered' else 'Waiting for reply' }}
+      </span>
+    </div>
+    <div class="text-muted small mt-1">{{ t.created_at.strftime('%d-%m-%Y %I:%M %p') }}</div>
+    <p class="mb-0 mt-2" style="white-space: pre-wrap;">{{ t.message }}</p>
+
+    {% if t.reply %}
+    <div class="border-start border-3 ps-3 mt-3">
+      <div class="small text-bw-teal fw-bold">
+        Reply from the office
+        {% if t.replied_at %}&middot; {{ t.replied_at.strftime('%d-%m-%Y') }}{% endif %}
+      </div>
+      <p class="mb-0 mt-1" style="white-space: pre-wrap;">{{ t.reply }}</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% else %}
+<div class="card bw-card">
+  <div class="card-body text-muted">You have not sent any messages yet.</div>
+</div>
+{% endfor %}
+{% endblock %}

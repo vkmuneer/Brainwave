@@ -37,6 +37,7 @@ from ..models import (
     VideoClass,
     AuditLog,
     Branch,
+    Feedback,
 )
 from ..utils.decorators import admin_required, office_required
 from ..utils.scope import (
@@ -63,6 +64,8 @@ from ..utils.excel import (
     parse_upload,
     build_marks_template,
     parse_marks_upload,
+    build_payments_template,
+    parse_payments_upload,
 )
 from ..utils.pdf import render_pdf
 from ..utils.exam_analysis import compute_exam_results, build_report_context, student_progress
@@ -1270,6 +1273,182 @@ def settings_test_whatsapp():
             "info",
         )
     return redirect(url_for("admin.settings"))
+
+
+@admin_bp.route("/payments/bulk-upload", methods=["GET", "POST"])
+@login_required
+@office_required
+def payments_bulk_upload():
+    if request.method == "POST":
+        upload = request.files.get("file")
+        if not upload or not upload.filename:
+            flash("Choose a filled payments sheet (.xlsx) to upload.", "danger")
+            return redirect(url_for("admin.payments_bulk_upload"))
+
+        try:
+            rows = parse_payments_upload(upload)
+        except ValueError as exc:
+            flash(str(exc), "danger")
+            return redirect(url_for("admin.payments_bulk_upload"))
+
+        students = {
+            s.admission_no.strip().lower(): s
+            for s in limit_students(Student.query.filter_by(active=True)).all()
+        }
+
+        saved = 0
+        total = 0.0
+        errors = []
+
+        for row in rows:
+            admission_no = str(row.get("admission_no", "")).strip()
+            student = students.get(admission_no.lower())
+            if student is None:
+                errors.append(f"Row {row['_row']}: no active student {admission_no}.")
+                continue
+
+            try:
+                amount = float(row["amount"])
+            except (TypeError, ValueError):
+                errors.append(f"Row {row['_row']}: '{row['amount']}' is not an amount.")
+                continue
+            if amount <= 0:
+                errors.append(f"Row {row['_row']}: amount must be more than zero.")
+                continue
+            # The single-payment form refuses overpayment; the sheet must too,
+            # or a typo silently creates a credit nobody reconciles.
+            if amount > student.pending_fee:
+                errors.append(
+                    f"Row {row['_row']}: {student.name} owes only "
+                    f"Rs. {student.pending_fee:,.0f} - Rs. {amount:,.0f} rejected."
+                )
+                continue
+
+            raw_date = row.get("payment_date")
+            try:
+                if isinstance(raw_date, datetime):
+                    paid_on = raw_date.date()
+                elif isinstance(raw_date, date):
+                    paid_on = raw_date
+                elif raw_date:
+                    paid_on = datetime.strptime(str(raw_date).strip()[:10], "%Y-%m-%d").date()
+                else:
+                    paid_on = date.today()
+            except ValueError:
+                errors.append(f"Row {row['_row']}: '{raw_date}' is not a date (use YYYY-MM-DD).")
+                continue
+
+            mode = (str(row.get("mode") or "Cash")).strip() or "Cash"
+            payment = FeePayment(
+                student_id=student.id,
+                amount=amount,
+                payment_date=paid_on,
+                mode=mode,
+                remarks=(str(row.get("remarks") or "")).strip()[:255],
+                recorded_by=current_user.name,
+            )
+            db.session.add(payment)
+            db.session.flush()
+            payment.receipt_no = f"BW{payment.id:05d}"
+            saved += 1
+            total += amount
+
+        db.session.commit()
+
+        if saved:
+            flash(f"Recorded {saved} payment(s) totalling Rs. {total:,.0f}.", "success")
+        for message in errors[:12]:
+            flash(message, "warning")
+        if len(errors) > 12:
+            flash(f"...and {len(errors) - 12} more problem(s) not shown.", "warning")
+        if not saved and not errors:
+            flash("Nothing to record - no amounts were filled in.", "info")
+        return redirect(url_for("admin.payments_bulk_upload"))
+
+    return render_template("admin/payments_bulk_upload.html", classes=_classes_sorted())
+
+
+@admin_bp.route("/payments/bulk-upload/template")
+@login_required
+@office_required
+def payments_bulk_template():
+    query = limit_students(Student.query.filter_by(active=True))
+    class_id = request.args.get("class_id", type=int)
+    if class_id:
+        ensure_class_visible(class_id)
+        query = query.filter_by(class_id=class_id)
+
+    students = [s for s in query.order_by(Student.name).all() if s.pending_fee > 0]
+    buffer = build_payments_template(students)
+    return send_file(
+        buffer,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name="fee_payments.xlsx",
+    )
+
+
+@admin_bp.route("/feedback")
+@login_required
+@office_required
+def feedback():
+    show = request.args.get("show", "open")
+    query = Feedback.query.join(Student)
+    class_ids = visible_class_ids()
+    if class_ids is not None:
+        query = query.filter(Student.class_id.in_(class_ids or [-1]))
+    if show in ("open", "answered"):
+        query = query.filter(Feedback.status == show)
+
+    return render_template(
+        "admin/feedback.html",
+        threads=query.order_by(Feedback.created_at.desc()).limit(200).all(),
+        show=show,
+    )
+
+
+@admin_bp.route("/feedback/<int:feedback_id>/reply", methods=["POST"])
+@login_required
+@office_required
+def feedback_reply(feedback_id):
+    thread = Feedback.query.get_or_404(feedback_id)
+    ensure_student_visible(thread.student)
+
+    reply = request.form.get("reply", "").strip()
+    if not reply:
+        flash("Type a reply before sending.", "danger")
+        return redirect(url_for("admin.feedback"))
+
+    thread.reply = reply[:2000]
+    thread.status = "answered"
+    thread.replied_by = current_user.name
+    thread.replied_at = datetime.utcnow()
+    db.session.commit()
+
+    # The parent sees the reply in the portal; WhatsApp only tells them to look,
+    # so a private message is not copied into an unencrypted channel.
+    if request.form.get("notify"):
+        student = thread.student
+        result = send_whatsapp_message(
+            student.parent_whatsapp,
+            f"Dear Parent, the academy office has replied to your message about "
+            f"{student.name}. Please open the student portal to read it.",
+        )
+        db.session.add(
+            MessageLog(
+                student_id=student.id,
+                category="broadcast",
+                message="Feedback reply notification",
+                phone=student.parent_whatsapp,
+                status=result["status"],
+                detail=result["detail"],
+                manual_link=result["link"],
+            )
+        )
+        db.session.commit()
+
+    flash("Reply sent - the parent will see it in the portal.", "success")
+    return redirect(url_for("admin.feedback"))
 
 
 @admin_bp.route("/audit-log")

@@ -91,6 +91,11 @@ def create_app(config_class=Config):
     def inject_globals():
         pending_resets = 0
         pending_videos = 0
+        pending_feedback = 0
+        if current_user.is_authenticated and current_user.is_office_staff:
+            from .models import Feedback
+
+            pending_feedback = Feedback.query.filter_by(status="open").count()
         if current_user.is_authenticated and current_user.is_admin:
             from .models import PasswordResetRequest, VideoClass
 
@@ -101,6 +106,7 @@ def create_app(config_class=Config):
             "app_name": "Brainwave Academy",
             "pending_reset_count": pending_resets,
             "pending_video_count": pending_videos,
+            "pending_feedback_count": pending_feedback,
         }
 
     with app.app_context():

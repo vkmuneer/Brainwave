@@ -439,6 +439,36 @@ _YOUTUBE_ID = re.compile(r"^[A-Za-z0-9_-]{6,20}$")
 _DRIVE_ID = re.compile(r"^[A-Za-z0-9_-]{10,80}$")
 
 
+class Feedback(db.Model):
+    """A message from a parent to the office, and the office's reply.
+
+    Kept against the student rather than a login, so the office always knows
+    which family is writing even though parents sign in by phone number.
+    """
+
+    __tablename__ = "feedback"
+
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("students.id"), nullable=False)
+
+    subject = db.Column(db.String(40), nullable=False, default="General")
+    message = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    status = db.Column(db.String(10), default="open", nullable=False)  # open / answered
+    reply = db.Column(db.Text)
+    replied_by = db.Column(db.String(120))
+    replied_at = db.Column(db.DateTime)
+
+    student = db.relationship("Student")
+
+    def __repr__(self):
+        return f"<Feedback {self.student_id} {self.status}>"
+
+
+FEEDBACK_SUBJECTS = ["General", "Fees", "Attendance", "Exams & marks", "Classes", "Complaint"]
+
+
 class AuditLog(db.Model):
     """Who changed what, and from what to what.
 

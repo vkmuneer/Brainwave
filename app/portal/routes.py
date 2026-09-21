@@ -282,3 +282,49 @@ def report_card(exam_id):
         as_attachment=True,
         download_name=f"report_card_{student.admission_no}_{exam.name.replace(' ', '_')}.pdf",
     )
+
+
+@portal_bp.route("/feedback", methods=["GET", "POST"])
+@portal_login_required
+def feedback():
+    from ..models import Feedback, FEEDBACK_SUBJECTS
+    from ..extensions import db
+
+    student = _selected_student()
+
+    if request.method == "POST":
+        message = request.form.get("message", "").strip()
+        subject = request.form.get("subject", "General")
+        if subject not in FEEDBACK_SUBJECTS:
+            subject = "General"
+
+        if not message:
+            flash("Please type your message.", "danger")
+        elif len(message) > 2000:
+            flash("Please keep the message under 2000 characters.", "danger")
+        else:
+            waiting = Feedback.query.filter_by(student_id=student.id, status="open").count()
+            if waiting >= 5:
+                flash(
+                    "You already have several messages waiting for a reply. "
+                    "Please wait for the office to respond.",
+                    "warning",
+                )
+            else:
+                db.session.add(
+                    Feedback(student_id=student.id, subject=subject, message=message)
+                )
+                db.session.commit()
+                flash("Your message has been sent to the academy office.", "success")
+            return redirect(url_for("portal.feedback", student_id=student.id))
+
+    return render_template(
+        "portal/feedback.html",
+        student=student,
+        students=current_students(),
+        subjects=FEEDBACK_SUBJECTS,
+        threads=Feedback.query.filter_by(student_id=student.id)
+        .order_by(Feedback.created_at.desc())
+        .limit(30)
+        .all(),
+    )
