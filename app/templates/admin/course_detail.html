@@ -11,7 +11,7 @@
     <div class="card bw-card">
       <div class="card-header bg-white fw-bold text-bw-teal">Course details</div>
       <div class="card-body">
-        <form method="post" action="{{ url_for('admin.course_form', course_id=course.id) }}">
+        <form method="post" action="{{ url_for('admin.course_form', course_id=course.id) }}" enctype="multipart/form-data">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="mb-2">
             <label class="form-label">Title</label>
@@ -37,6 +37,15 @@
             <label class="form-label">Description</label>
             <textarea name="description" class="form-control" rows="3">{{ course.description or '' }}</textarea>
           </div>
+          <div class="mb-2">
+            <label class="form-label">Cover picture</label>
+            {% if course.thumbnail_data %}
+            <img src="{{ url_for('public.course_thumb', course_id=course.id) }}" alt=""
+                 class="w-100 rounded mb-2" style="aspect-ratio:16/9;object-fit:cover;">
+            {% endif %}
+            <input type="file" name="thumbnail" class="form-control" accept="image/png,image/jpeg,image/webp">
+            <div class="form-text">Leave empty to keep the current picture.</div>
+          </div>
           <div class="form-check mb-3">
             <input class="form-check-input" type="checkbox" name="published" id="pub2" value="1"
                    {{ 'checked' if course.published }}>
@@ -52,7 +61,7 @@
     <div class="card bw-card mb-3">
       <div class="card-header bg-white fw-bold text-bw-teal">Add a lecture</div>
       <div class="card-body">
-        <form method="post" action="{{ url_for('admin.course_video_add', course_id=course.id) }}">
+        <form method="post" action="{{ url_for('admin.course_video_add', course_id=course.id) }}" enctype="multipart/form-data">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="row g-2">
             <div class="col-12 col-sm-8 mb-2">
@@ -76,6 +85,11 @@
           <div class="mb-2">
             <label class="form-label">Notes <span class="text-muted">(optional)</span></label>
             <input type="text" name="description" class="form-control" maxlength="500">
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Thumbnail <span class="text-muted">(optional)</span></label>
+            <input type="file" name="thumbnail" class="form-control form-control-sm"
+                   accept="image/png,image/jpeg,image/webp">
           </div>
           <button class="btn btn-bw-primary btn-sm"><i class="bi bi-plus-lg"></i> Add lecture</button>
         </form>

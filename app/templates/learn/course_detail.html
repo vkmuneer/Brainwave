@@ -2,6 +2,10 @@
 {% block title %}{{ course.title }} - {{ app_name }}{% endblock %}
 {% block content %}
 <div class="card bw-card mb-3">
+  {% if course.thumbnail_data %}
+  <img src="{{ url_for('public.course_thumb', course_id=course.id) }}" alt=""
+       class="card-img-top" style="aspect-ratio:16/9;object-fit:cover;">
+  {% endif %}
   <div class="card-body">
     <h5 class="text-bw-teal mb-1">{{ course.title }}</h5>
     {% if course.subject_label %}<div class="text-muted small">{{ course.subject_label }}</div>{% endif %}
@@ -46,9 +50,15 @@
 <div class="list-group mb-3">
   {% for v in course.videos if v.published %}
   <div class="list-group-item d-flex justify-content-between align-items-center">
-    <div>
+    <div class="d-flex align-items-center gap-3">
+      {% if v.thumbnail_data %}
+      <img src="{{ url_for('public.lecture_thumb', video_id=v.id) }}" alt=""
+           class="rounded" style="width:96px;aspect-ratio:16/9;object-fit:cover;">
+      {% endif %}
+      <div>
       <div class="fw-bold">{{ loop.index }}. {{ v.title }}</div>
       {% if v.description %}<div class="small text-muted">{{ v.description }}</div>{% endif %}
+      </div>
     </div>
     {% if can_watch %}
     <a href="{{ url_for('learn.watch', course_id=course.id, video_id=v.id) }}"

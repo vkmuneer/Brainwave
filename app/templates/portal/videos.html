@@ -13,6 +13,10 @@
       {% if v.subject %}{{ v.subject.name }} &middot; {% endif %}
       {{ v.uploaded_by_name or 'Teacher' }} &middot; {{ v.created_at.strftime('%d-%m-%Y') }}
     </div>
+    {% if v.thumbnail_data %}
+    <img src="{{ url_for('public.class_video_thumb', video_id=v.id) }}" alt=""
+         class="w-100 rounded mb-2" style="aspect-ratio:16/9;object-fit:cover;">
+    {% endif %}
     {% if v.description %}<p class="small mb-2">{{ v.description }}</p>{% endif %}
 
     {% if v.embed_url %}

@@ -99,13 +99,37 @@
     footer a { color: #fff; text-decoration: none; }
     footer a:hover { text-decoration: underline; }
 
+    .stats-band { padding: 3rem 0; }
+    .stat .n {
+      font-variant-numeric: tabular-nums;
+      background: linear-gradient(135deg, var(--dark-teal), var(--blue));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+
+    .class-pill { transition: transform .18s ease, border-color .18s ease; }
+    .class-pill:hover { transform: translateY(-3px); border-color: var(--teal); }
+
+    .icon-chip { transition: transform .18s ease; }
+    .card-soft:hover .icon-chip { transform: scale(1.06) rotate(-3deg); }
+
+    .hero .btn-solid, .hero .btn-ghost { transition: transform .15s ease; }
+    .hero .btn-solid:hover, .hero .btn-ghost:hover { transform: translateY(-2px); }
+
+    /* Sections fade up as they come into view. Anything without JS, or with
+       reduced motion, simply shows them. */
+    .reveal { opacity: 0; transform: translateY(14px); }
+    .reveal.shown { opacity: 1; transform: none; transition: opacity .5s ease, transform .5s ease; }
+
     @media (prefers-reduced-motion: reduce) {
-      .card-soft { transition: none; }
-      .card-soft:hover { transform: none; }
+      .card-soft, .class-pill, .icon-chip, .hero .btn-solid, .hero .btn-ghost { transition: none; }
+      .card-soft:hover, .class-pill:hover, .hero .btn-solid:hover, .hero .btn-ghost:hover { transform: none; }
+      .reveal, .reveal.shown { opacity: 1; transform: none; transition: none; }
     }
   </style>
 </head>
 <body>
+
+{% include "_main_nav.html" %}
 
 <div class="bw-top">
   <div class="container d-flex justify-content-between align-items-center py-2">
@@ -166,13 +190,13 @@
   </div>
 </div>
 
-<section>
+<section class="stats-band">
   <div class="container">
     <div class="row g-4 justify-content-center">
       {% for s in stats %}
       <div class="col-6 col-md-3">
         <div class="stat">
-          <div class="n">{{ s.value }}</div>
+          <div class="n" data-count-to="{{ s.value }}">0</div>
           <div class="l">{{ s.label }}</div>
         </div>
       </div>
@@ -191,7 +215,7 @@
     <div class="row g-3">
       {% for c in classes %}
       <div class="col-6 col-lg-3">
-        <div class="class-pill">
+        <div class="class-pill reveal">
           <div class="name">{{ c.name }}</div>
           <div class="text-muted small mt-1">
             {{ c.divisions | length }} division{{ '' if c.divisions | length == 1 else 's' }}
@@ -210,7 +234,7 @@
     <div class="row g-4">
       {% for f in features %}
       <div class="col-12 col-md-6 col-lg-4">
-        <div class="card-soft">
+        <div class="card-soft reveal">
           <div class="icon-chip"><i class="bi {{ f.icon }}"></i></div>
           <h5 class="mb-2">{{ f.title }}</h5>
           <p class="lead-muted mb-0" style="font-size: .98rem;">{{ f.text }}</p>
@@ -340,5 +364,54 @@
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  (function () {
+    var calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Numbers count up the first time they are scrolled into view. Without
+    // IntersectionObserver, or with reduced motion, they simply show.
+    var numbers = document.querySelectorAll('[data-count-to]');
+    function settle(el) { el.textContent = el.dataset.countTo; }
+
+    if (calm || !('IntersectionObserver' in window)) {
+      numbers.forEach(settle);
+    } else {
+      var counter = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          counter.unobserve(entry.target);
+          var el = entry.target;
+          var target = parseInt(el.dataset.countTo, 10) || 0;
+          if (target === 0) { settle(el); return; }
+          var started = null, duration = 1100;
+          function step(now) {
+            if (started === null) started = now;
+            var progress = Math.min((now - started) / duration, 1);
+            // Ease out, so it slows as it lands rather than stopping dead.
+            var eased = 1 - Math.pow(1 - progress, 3);
+            el.textContent = Math.round(target * eased);
+            if (progress < 1) requestAnimationFrame(step); else settle(el);
+          }
+          requestAnimationFrame(step);
+        });
+      }, { threshold: 0.4 });
+      numbers.forEach(function (el) { counter.observe(el); });
+    }
+
+    var reveals = document.querySelectorAll('.reveal');
+    if (calm || !('IntersectionObserver' in window)) {
+      reveals.forEach(function (el) { el.classList.add('shown'); });
+    } else {
+      var shower = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add('shown');
+          shower.unobserve(entry.target);
+        });
+      }, { threshold: 0.15 });
+      reveals.forEach(function (el) { shower.observe(el); });
+    }
+  })();
+</script>
 </body>
 </html>

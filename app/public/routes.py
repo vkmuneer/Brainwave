@@ -91,6 +91,39 @@ def home():
     )
 
 
+def _serve_thumbnail(record):
+    """A stored picture, or a 404 so the page falls back to its placeholder."""
+    if record is None or not record.thumbnail_data:
+        abort(404)
+    response = send_file(
+        BytesIO(record.thumbnail_data),
+        mimetype=record.thumbnail_mimetype or "image/png",
+    )
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return response
+
+
+@public_bp.route("/thumb/class-video/<int:video_id>")
+def class_video_thumb(video_id):
+    from ..models import VideoClass
+
+    return _serve_thumbnail(VideoClass.query.get(video_id))
+
+
+@public_bp.route("/thumb/course/<int:course_id>")
+def course_thumb(course_id):
+    from ..models import Course
+
+    return _serve_thumbnail(Course.query.get(course_id))
+
+
+@public_bp.route("/thumb/lecture/<int:video_id>")
+def lecture_thumb(video_id):
+    from ..models import CourseVideo
+
+    return _serve_thumbnail(CourseVideo.query.get(video_id))
+
+
 @public_bp.route("/logo")
 def logo():
     """Serves the uploaded academy logo, falling back to the bundled one.

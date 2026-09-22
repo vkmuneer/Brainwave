@@ -12,7 +12,7 @@
       the link here. Only students of the class you choose will see it, and only after they
       log in.
     </p>
-    <form method="post" action="{{ url_for('teacher.video_add') }}">
+    <form method="post" action="{{ url_for('teacher.video_add') }}" enctype="multipart/form-data">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="mb-3">
         <label class="form-label">Title</label>
@@ -47,6 +47,11 @@
         <label class="form-label">Notes <span class="text-muted">(optional)</span></label>
         <textarea name="description" class="form-control" rows="2" maxlength="500"
                   placeholder="Covers exercise 4.3"></textarea>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Thumbnail <span class="text-muted">(optional)</span></label>
+        <input type="file" name="thumbnail" class="form-control" accept="image/png,image/jpeg,image/webp">
+        <div class="form-text">PNG, JPG or WebP up to 2 MB. A wide 16:9 picture looks best.</div>
       </div>
       <button type="submit" class="btn btn-bw-primary"><i class="bi bi-upload"></i> Publish</button>
     </form>
@@ -90,6 +95,10 @@
           Not approved{% if v.review_note %}: {{ v.review_note }}{% endif %}.
           Contact the office if you think this is a mistake.
         </div>
+        {% endif %}
+        {% if v.thumbnail_data %}
+        <img src="{{ url_for('public.class_video_thumb', video_id=v.id) }}" alt=""
+             class="w-100 rounded mb-2" style="aspect-ratio:16/9;object-fit:cover;">
         {% endif %}
         {% if v.description %}<p class="small">{{ v.description }}</p>{% endif %}
         <div class="d-flex gap-2 flex-wrap">

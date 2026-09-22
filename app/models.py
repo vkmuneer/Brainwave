@@ -516,6 +516,11 @@ class VideoClass(db.Model):
     url = db.Column(db.String(500))
     file_path = db.Column(db.String(300))
 
+    # Held in the database like the logo, so one backup carries the pictures
+    # too and a redeploy onto a fresh filesystem does not blank them.
+    thumbnail_data = db.Column(db.LargeBinary)
+    thumbnail_mimetype = db.Column(db.String(40))
+
     uploaded_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     uploaded_by_name = db.Column(db.String(120))
     published = db.Column(db.Boolean, default=True, nullable=False)
@@ -749,6 +754,9 @@ class Course(db.Model):
     published = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
+    thumbnail_data = db.Column(db.LargeBinary)
+    thumbnail_mimetype = db.Column(db.String(40))
+
     videos = db.relationship(
         "CourseVideo",
         backref="course",
@@ -785,6 +793,8 @@ class CourseVideo(db.Model):
     title = db.Column(db.String(150), nullable=False)
     description = db.Column(db.String(500))
     url = db.Column(db.String(500))
+    thumbnail_data = db.Column(db.LargeBinary)
+    thumbnail_mimetype = db.Column(db.String(40))
     sequence = db.Column(db.Integer, default=0, nullable=False)
     published = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)

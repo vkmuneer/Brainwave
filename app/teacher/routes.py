@@ -16,6 +16,7 @@ from ..models import (
     VideoClass,
 )
 from ..utils.decorators import teacher_required
+from ..utils.images import read_image_upload
 from ..utils.whatsapp import send_whatsapp_message, absence_message
 from ..utils.attendance import (
     resolve_session,
@@ -456,11 +457,18 @@ def video_add():
     if subject_id and subject_id not in {s.id for s in current_user.teacher.subjects}:
         abort(403)
 
+    thumb_data, thumb_type, thumb_error = read_image_upload(request.files.get("thumbnail"))
+    if thumb_error:
+        flash(thumb_error, "danger")
+        return redirect(url_for("teacher.videos"))
+
     db.session.add(
         VideoClass(
             title=title,
             description=description,
             url=url,
+            thumbnail_data=thumb_data,
+            thumbnail_mimetype=thumb_type,
             class_id=class_id,
             division_id=division_id,
             subject_id=subject_id or None,

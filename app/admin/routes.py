@@ -74,6 +74,7 @@ from ..utils.excel import (
 from ..utils.pdf import render_pdf
 from ..utils.exam_analysis import compute_exam_results, build_report_context, student_progress
 from ..utils.video import is_acceptable_link
+from ..utils.images import read_image_upload
 
 
 def _pdf_response(template_name, filename, **context):
@@ -2495,6 +2496,14 @@ def course_form(course_id=None):
     course.duration_days = max(request.form.get("duration_days", type=int) or 30, 1)
     course.published = bool(request.form.get("published"))
 
+    thumb_data, thumb_type, thumb_error = read_image_upload(request.files.get("thumbnail"))
+    if thumb_error:
+        flash(thumb_error, "danger")
+        return redirect(url_for("admin.courses"))
+    if thumb_data:
+        course.thumbnail_data = thumb_data
+        course.thumbnail_mimetype = thumb_type
+
     if course_id is None:
         db.session.add(course)
     db.session.commit()
@@ -2523,12 +2532,19 @@ def course_video_add(course_id):
     elif not is_acceptable_link(url):
         flash("The link must start with http:// or https://", "danger")
     else:
+        thumb_data, thumb_type, thumb_error = read_image_upload(request.files.get("thumbnail"))
+        if thumb_error:
+            flash(thumb_error, "danger")
+            return redirect(url_for("admin.course_detail", course_id=course.id))
+
         next_seq = max([v.sequence for v in course.videos], default=0) + 1
         db.session.add(
             CourseVideo(
                 course_id=course.id,
                 title=title,
                 url=url,
+                thumbnail_data=thumb_data,
+                thumbnail_mimetype=thumb_type,
                 description=request.form.get("description", "").strip()[:500],
                 sequence=request.form.get("sequence", type=int) or next_seq,
             )
