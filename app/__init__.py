@@ -152,6 +152,7 @@ def create_app(config_class=Config):
         pending_videos = 0
         pending_feedback = 0
         pending_subs = 0
+        open_questions = 0
         if current_user.is_authenticated and current_user.is_office_staff:
             from .models import Feedback, Subscription
 
@@ -162,6 +163,9 @@ def create_app(config_class=Config):
 
             pending_resets = PasswordResetRequest.query.filter_by(status="pending").count()
             pending_videos = VideoClass.query.filter_by(approval="pending").count()
+            from .models import CourseQuestion
+
+            open_questions = CourseQuestion.query.filter(CourseQuestion.answer.is_(None)).count()
         return {
             "today": date.today(),
             "app_name": "Brainwave Academy",
@@ -169,6 +173,7 @@ def create_app(config_class=Config):
             "pending_video_count": pending_videos,
             "pending_feedback_count": pending_feedback,
             "pending_subscription_count": pending_subs,
+            "open_question_count": open_questions,
         }
 
     with app.app_context():

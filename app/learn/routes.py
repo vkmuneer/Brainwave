@@ -259,3 +259,178 @@ def payment(subscription_id):
         settings=settings,
         upi_link=upi_link,
     )
+
+
+# ------------------------------------------------------- questions & answers
+def _require_active_subscription(course_id):
+    """The subscriber, if their subscription to this course is current.
+
+    Asking a question or submitting work is part of the course, so it needs the
+    same live subscription that watching does.
+    """
+    me = current_subscriber()
+    if me is None or not me.can_watch(course_id):
+        return None
+    return me
+
+
+@learn_bp.route("/course/<int:course_id>/questions", methods=["GET", "POST"])
+@subscriber_required
+def questions(course_id):
+    from ..models import CourseQuestion
+
+    course = Course.query.get_or_404(course_id)
+    me = _require_active_subscription(course.id)
+    if me is None:
+        flash("Your subscription for this course is not active.", "warning")
+        return redirect(url_for("learn.course_detail", course_id=course.id))
+
+    if request.method == "POST":
+        body = request.form.get("body", "").strip()
+        video_id = request.form.get("video_id", type=int)
+        if not body:
+            flash("Please type your question.", "danger")
+        elif len(body) > 2000:
+            flash("Please keep the question under 2000 characters.", "danger")
+        else:
+            waiting = CourseQuestion.query.filter_by(
+                course_id=course.id, subscriber_id=me.id, answer=None
+            ).count()
+            if waiting >= 5:
+                flash(
+                    "You already have several questions waiting for an answer. "
+                    "Please wait for those to be answered first.",
+                    "warning",
+                )
+            else:
+                db.session.add(
+                    CourseQuestion(
+                        course_id=course.id,
+                        subscriber_id=me.id,
+                        video_id=video_id or None,
+                        body=body,
+                    )
+                )
+                db.session.commit()
+                flash("Your question has been sent to the academy.", "success")
+        return redirect(url_for("learn.questions", course_id=course.id))
+
+    rows = (
+        CourseQuestion.query.filter_by(course_id=course.id)
+        .order_by(CourseQuestion.created_at.desc())
+        .limit(200)
+        .all()
+    )
+    # Answered questions help everyone on the course; an unanswered one is
+    # nobody's business but the asker's.
+    visible = [q for q in rows if q.is_answered or q.subscriber_id == me.id]
+
+    return render_template(
+        "learn/questions.html", course=course, questions=visible, me=me
+    )
+
+
+# ------------------------------------------------------------- assignments
+@learn_bp.route("/course/<int:course_id>/assignments")
+@subscriber_required
+def assignments(course_id):
+    from ..models import Assignment
+
+    course = Course.query.get_or_404(course_id)
+    me = _require_active_subscription(course.id)
+    if me is None:
+        flash("Your subscription for this course is not active.", "warning")
+        return redirect(url_for("learn.course_detail", course_id=course.id))
+
+    rows = (
+        Assignment.query.filter_by(course_id=course.id, published=True)
+        .order_by(Assignment.created_at.desc())
+        .all()
+    )
+    return render_template(
+        "learn/assignments.html",
+        course=course,
+        assignments=rows,
+        me=me,
+    )
+
+
+@learn_bp.route("/assignment/<int:assignment_id>", methods=["GET", "POST"])
+@subscriber_required
+def assignment_detail(assignment_id):
+    from ..models import Assignment, AssignmentSubmission
+    from ..utils.images import read_image_upload
+
+    assignment = Assignment.query.get_or_404(assignment_id)
+    if not assignment.published:
+        abort(404)
+
+    me = _require_active_subscription(assignment.course_id)
+    if me is None:
+        flash("Your subscription for this course is not active.", "warning")
+        return redirect(url_for("learn.course_detail", course_id=assignment.course_id))
+
+    submission = assignment.submission_for(me.id)
+
+    if request.method == "POST":
+        if submission and submission.is_evaluated:
+            # Letting work change after marking would leave the mark describing
+            # something that no longer exists.
+            flash("This has already been marked and cannot be changed.", "warning")
+            return redirect(url_for("learn.assignment_detail", assignment_id=assignment.id))
+
+        text = request.form.get("answer_text", "").strip()
+        link = request.form.get("answer_link", "").strip()
+        data, mimetype, error = read_image_upload(request.files.get("attachment"))
+
+        if error:
+            flash(error, "danger")
+            return redirect(url_for("learn.assignment_detail", assignment_id=assignment.id))
+        if link and not link.lower().startswith(("http://", "https://")):
+            flash("A link must start with http:// or https://", "danger")
+            return redirect(url_for("learn.assignment_detail", assignment_id=assignment.id))
+        if not text and not link and not data:
+            flash("Write an answer, attach a picture, or give a link.", "danger")
+            return redirect(url_for("learn.assignment_detail", assignment_id=assignment.id))
+
+        if submission is None:
+            submission = AssignmentSubmission(
+                assignment_id=assignment.id, subscriber_id=me.id
+            )
+            db.session.add(submission)
+
+        submission.answer_text = text[:5000]
+        submission.answer_link = link[:500]
+        if data:
+            submission.attachment_data = data
+            submission.attachment_mimetype = mimetype
+        submission.submitted_at = datetime.utcnow()
+        db.session.commit()
+        flash("Your work has been submitted.", "success")
+        return redirect(url_for("learn.assignment_detail", assignment_id=assignment.id))
+
+    return render_template(
+        "learn/assignment_detail.html",
+        assignment=assignment,
+        submission=submission,
+        me=me,
+    )
+
+
+@learn_bp.route("/submission/<int:submission_id>/attachment")
+@subscriber_required
+def submission_attachment(submission_id):
+    from ..models import AssignmentSubmission
+    from io import BytesIO
+    from flask import send_file
+
+    submission = AssignmentSubmission.query.get_or_404(submission_id)
+    me = current_subscriber()
+    if submission.subscriber_id != me.id:
+        abort(403)
+    if not submission.attachment_data:
+        abort(404)
+    return send_file(
+        BytesIO(submission.attachment_data),
+        mimetype=submission.attachment_mimetype or "image/png",
+    )

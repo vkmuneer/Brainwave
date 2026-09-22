@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Assignments - {{ course.title }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="text-bw-teal m-0">Assignments &mdash; {{ course.title }}</h4>
+  <a href="{{ url_for('admin.course_detail', course_id=course.id) }}"
+     class="btn btn-sm btn-outline-secondary">Back to course</a>
+</div>
+
+<div class="card bw-card mb-4" style="max-width: 640px;">
+  <div class="card-body">
+    <h6 class="text-bw-teal">Set an assignment</h6>
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-2">
+        <label class="form-label">Title</label>
+        <input type="text" name="title" class="form-control" required
+               placeholder="Chapter 3 exercises">
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Instructions</label>
+        <textarea name="instructions" class="form-control" rows="3"
+                  placeholder="What the student has to do"></textarea>
+      </div>
+      <div class="row g-2">
+        <div class="col-6 mb-2">
+          <label class="form-label">Out of</label>
+          <input type="number" name="max_marks" class="form-control" min="1" value="10">
+        </div>
+        <div class="col-6 mb-2">
+          <label class="form-label">Due date <span class="text-muted">(optional)</span></label>
+          <input type="date" name="due_on" class="form-control">
+        </div>
+      </div>
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" name="published" id="apub" value="1" checked>
+        <label class="form-check-label" for="apub">Visible to subscribers straight away</label>
+      </div>
+      <button class="btn btn-bw-primary"><i class="bi bi-plus-lg"></i> Add assignment</button>
+    </form>
+  </div>
+</div>
+
+<div class="row g-3">
+  {% for a in assignments %}
+  {% set pending = a.submissions | rejectattr('is_evaluated') | list | length %}
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="card bw-card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <div class="fw-bold">{{ a.title }}</div>
+          {% if not a.published %}<span class="badge bg-secondary">Hidden</span>{% endif %}
+        </div>
+        <div class="text-muted small">
+          Out of {{ a.max_marks | int }}
+          {% if a.due_on %} &middot; due {{ a.due_on.strftime('%d-%m-%Y') }}{% endif %}
+        </div>
+        <div class="small mt-2">
+          {{ a.submissions | length }} submission(s)
+          {% if pending %}
+          <span class="badge bg-danger rounded-pill">{{ pending }} to mark</span>
+          {% endif %}
+        </div>
+        <a href="{{ url_for('admin.assignment_submissions', assignment_id=a.id) }}"
+           class="btn btn-sm btn-outline-secondary mt-2">Open submissions</a>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12"><p class="text-muted">No assignments set yet.</p></div>
+  {% endfor %}
+</div>
+{% endblock %}

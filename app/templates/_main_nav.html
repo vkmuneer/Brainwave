@@ -96,8 +96,8 @@
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
             <i class="bi bi-gear"></i> Setup
-            {% if pending_video_count or pending_reset_count %}
-            <span class="badge bg-danger rounded-pill">{{ pending_video_count + pending_reset_count }}</span>
+            {% if pending_video_count or pending_reset_count or open_question_count %}
+            <span class="badge bg-danger rounded-pill">{{ pending_video_count + pending_reset_count + open_question_count }}</span>
             {% endif %}
           </a>
           <ul class="dropdown-menu dropdown-menu-end">
@@ -107,6 +107,14 @@
             <li><a class="dropdown-item" href="{{ url_for('admin.masters') }}">Master Data</a></li>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item" href="{{ url_for('admin.courses') }}">Subscription Courses</a></li>
+            <li>
+              <a class="dropdown-item" href="{{ url_for('admin.course_questions') }}">
+                Course Questions
+                {% if open_question_count %}
+                <span class="badge bg-danger rounded-pill">{{ open_question_count }}</span>
+                {% endif %}
+              </a>
+            </li>
             <li><hr class="dropdown-divider"></li>
             <li>
               <a class="dropdown-item" href="{{ url_for('admin.videos') }}">

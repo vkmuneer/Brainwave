@@ -1,0 +1,42 @@
+{% extends "learn/learn_base.html" %}
+{% block title %}Assignments - {{ course.title }}{% endblock %}
+{% block content %}
+<a href="{{ url_for('learn.course_detail', course_id=course.id) }}"
+   class="btn btn-sm btn-outline-secondary mb-3">&larr; {{ course.title }}</a>
+
+<h5 class="text-bw-teal mb-3">Assignments</h5>
+
+{% for a in assignments %}
+{% set mine = a.submission_for(me.id) %}
+<div class="card bw-card mb-2">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start">
+      <div>
+        <div class="fw-bold">{{ a.title }}</div>
+        <div class="text-muted small">
+          Out of {{ a.max_marks | int }}
+          {% if a.due_on %} &middot; due {{ a.due_on.strftime('%d-%m-%Y') }}{% endif %}
+        </div>
+      </div>
+      {% if mine and mine.is_evaluated %}
+        <span class="badge bg-success">{{ mine.marks | int }} / {{ a.max_marks | int }}</span>
+      {% elif mine %}
+        <span class="badge bg-info text-dark">Submitted</span>
+      {% elif a.is_overdue %}
+        <span class="badge bg-danger">Overdue</span>
+      {% else %}
+        <span class="badge bg-warning text-dark">Not submitted</span>
+      {% endif %}
+    </div>
+    <a href="{{ url_for('learn.assignment_detail', assignment_id=a.id) }}"
+       class="btn btn-sm btn-bw-primary mt-3">
+      {{ 'View feedback' if mine and mine.is_evaluated else ('View and edit' if mine else 'Open') }}
+    </a>
+  </div>
+</div>
+{% else %}
+<div class="card bw-card"><div class="card-body text-muted">
+  No assignments have been set for this course yet.
+</div></div>
+{% endfor %}
+{% endblock %}

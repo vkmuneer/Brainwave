@@ -3,7 +3,11 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h4 class="text-bw-teal m-0">{{ course.title }}</h4>
-  <a href="{{ url_for('admin.courses') }}" class="btn btn-sm btn-outline-secondary">All courses</a>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('admin.course_assignments', course_id=course.id) }}"
+       class="btn btn-sm btn-outline-secondary">Assignments</a>
+    <a href="{{ url_for('admin.courses') }}" class="btn btn-sm btn-outline-secondary">All courses</a>
+  </div>
 </div>
 
 <div class="row g-3">

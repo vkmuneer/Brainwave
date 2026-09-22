@@ -860,3 +860,107 @@ class Subscription(db.Model):
 
     def __repr__(self):
         return f"<Subscription {self.subscriber_id} course={self.course_id} {self.status}>"
+
+
+class CourseQuestion(db.Model):
+    """A subscriber's question about a course, and the academy's answer.
+
+    Once answered it is shown to everyone subscribed to that course - the same
+    question usually occurs to several people, and answering it once helps all
+    of them. An unanswered question is visible only to whoever asked it.
+    """
+
+    __tablename__ = "course_questions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    course_id = db.Column(db.Integer, db.ForeignKey("courses.id"), nullable=False)
+    subscriber_id = db.Column(db.Integer, db.ForeignKey("subscribers.id"), nullable=False)
+    video_id = db.Column(db.Integer, db.ForeignKey("course_videos.id"), nullable=True)
+
+    body = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    answer = db.Column(db.Text)
+    answered_by = db.Column(db.String(120))
+    answered_at = db.Column(db.DateTime)
+
+    course = db.relationship("Course")
+    subscriber = db.relationship("Subscriber")
+    video = db.relationship("CourseVideo")
+
+    @property
+    def is_answered(self):
+        return bool(self.answer)
+
+    def __repr__(self):
+        return f"<CourseQuestion {self.course_id} {'answered' if self.is_answered else 'open'}>"
+
+
+class Assignment(db.Model):
+    __tablename__ = "assignments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    course_id = db.Column(db.Integer, db.ForeignKey("courses.id"), nullable=False)
+
+    title = db.Column(db.String(150), nullable=False)
+    instructions = db.Column(db.Text)
+    max_marks = db.Column(db.Float, default=10, nullable=False)
+    due_on = db.Column(db.Date)
+    published = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    course = db.relationship("Course")
+    submissions = db.relationship(
+        "AssignmentSubmission", backref="assignment", cascade="all, delete-orphan"
+    )
+
+    @property
+    def is_overdue(self):
+        return bool(self.due_on and self.due_on < date.today())
+
+    def submission_for(self, subscriber_id):
+        return next((s for s in self.submissions if s.subscriber_id == subscriber_id), None)
+
+    def __repr__(self):
+        return f"<Assignment {self.title}>"
+
+
+class AssignmentSubmission(db.Model):
+    """One subscriber's answer to an assignment, and how it was marked."""
+
+    __tablename__ = "assignment_submissions"
+    __table_args__ = (
+        db.UniqueConstraint("assignment_id", "subscriber_id", name="uq_submission_once"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    assignment_id = db.Column(db.Integer, db.ForeignKey("assignments.id"), nullable=False)
+    subscriber_id = db.Column(db.Integer, db.ForeignKey("subscribers.id"), nullable=False)
+
+    answer_text = db.Column(db.Text)
+    answer_link = db.Column(db.String(500))
+    # A photograph of handwritten work is the usual submission, so it is stored
+    # alongside the record rather than needing somewhere else to host it.
+    attachment_data = db.Column(db.LargeBinary)
+    attachment_mimetype = db.Column(db.String(40))
+
+    submitted_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    marks = db.Column(db.Float)
+    remarks = db.Column(db.Text)
+    evaluated_by = db.Column(db.String(120))
+    evaluated_at = db.Column(db.DateTime)
+
+    subscriber = db.relationship("Subscriber")
+
+    @property
+    def is_evaluated(self):
+        return self.marks is not None
+
+    @property
+    def was_late(self):
+        due = self.assignment.due_on
+        return bool(due and self.submitted_at.date() > due)
+
+    def __repr__(self):
+        return f"<AssignmentSubmission {self.assignment_id}/{self.subscriber_id}>"

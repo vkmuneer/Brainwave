@@ -42,6 +42,9 @@ from ..models import (
     Course,
     CourseVideo,
     Subscription,
+    CourseQuestion,
+    Assignment,
+    AssignmentSubmission,
 )
 from ..utils.decorators import admin_required, office_required
 from ..utils.scope import (
@@ -2623,3 +2626,129 @@ def subscription_decide(subscription_id):
         flash("Marked as not activated. The subscriber will see your note.", "info")
 
     return redirect(url_for("admin.subscriptions"))
+
+
+# ------------------------------------------- course questions & assignments
+@admin_bp.route("/course-questions")
+@login_required
+@admin_required
+def course_questions():
+    show = request.args.get("show", "open")
+    query = CourseQuestion.query
+    if show == "open":
+        query = query.filter(CourseQuestion.answer.is_(None))
+    elif show == "answered":
+        query = query.filter(CourseQuestion.answer.isnot(None))
+
+    return render_template(
+        "admin/course_questions.html",
+        questions=query.order_by(CourseQuestion.created_at.desc()).limit(200).all(),
+        show=show,
+        open_total=CourseQuestion.query.filter(CourseQuestion.answer.is_(None)).count(),
+    )
+
+
+@admin_bp.route("/course-questions/<int:question_id>/answer", methods=["POST"])
+@login_required
+@admin_required
+def course_question_answer(question_id):
+    question = CourseQuestion.query.get_or_404(question_id)
+    answer = request.form.get("answer", "").strip()
+    if not answer:
+        flash("Type an answer before sending.", "danger")
+        return redirect(url_for("admin.course_questions"))
+
+    question.answer = answer[:4000]
+    question.answered_by = current_user.name
+    question.answered_at = datetime.utcnow()
+    db.session.commit()
+    flash(
+        "Answer published - everyone subscribed to this course can now read it.",
+        "success",
+    )
+    return redirect(url_for("admin.course_questions"))
+
+
+@admin_bp.route("/courses/<int:course_id>/assignments", methods=["GET", "POST"])
+@login_required
+@admin_required
+def course_assignments(course_id):
+    course = Course.query.get_or_404(course_id)
+
+    if request.method == "POST":
+        title = request.form.get("title", "").strip()
+        if not title:
+            flash("An assignment needs a title.", "danger")
+            return redirect(url_for("admin.course_assignments", course_id=course.id))
+
+        due_raw = request.form.get("due_on", "")
+        due_on = datetime.strptime(due_raw, "%Y-%m-%d").date() if due_raw else None
+
+        db.session.add(
+            Assignment(
+                course_id=course.id,
+                title=title,
+                instructions=request.form.get("instructions", "").strip(),
+                max_marks=max(request.form.get("max_marks", type=float) or 10, 1),
+                due_on=due_on,
+                published=bool(request.form.get("published")),
+            )
+        )
+        db.session.commit()
+        flash(f'"{title}" added.', "success")
+        return redirect(url_for("admin.course_assignments", course_id=course.id))
+
+    return render_template(
+        "admin/course_assignments.html",
+        course=course,
+        assignments=Assignment.query.filter_by(course_id=course.id)
+        .order_by(Assignment.created_at.desc())
+        .all(),
+    )
+
+
+@admin_bp.route("/assignments/<int:assignment_id>/submissions")
+@login_required
+@admin_required
+def assignment_submissions(assignment_id):
+    assignment = Assignment.query.get_or_404(assignment_id)
+    rows = sorted(assignment.submissions, key=lambda s: (s.is_evaluated, s.submitted_at))
+    return render_template(
+        "admin/assignment_submissions.html", assignment=assignment, submissions=rows
+    )
+
+
+@admin_bp.route("/submissions/<int:submission_id>/evaluate", methods=["POST"])
+@login_required
+@admin_required
+def submission_evaluate(submission_id):
+    submission = AssignmentSubmission.query.get_or_404(submission_id)
+    marks = request.form.get("marks", type=float)
+    maximum = submission.assignment.max_marks
+
+    if marks is None or marks < 0 or marks > maximum:
+        flash(f"Marks must be between 0 and {maximum:g}.", "danger")
+    else:
+        submission.marks = marks
+        submission.remarks = request.form.get("remarks", "").strip()[:2000]
+        submission.evaluated_by = current_user.name
+        submission.evaluated_at = datetime.utcnow()
+        db.session.commit()
+        flash(f"{submission.subscriber.name}'s work marked {marks:g}/{maximum:g}.", "success")
+
+    return redirect(
+        url_for("admin.assignment_submissions", assignment_id=submission.assignment_id)
+    )
+
+
+@admin_bp.route("/submissions/<int:submission_id>/attachment")
+@login_required
+@admin_required
+def submission_attachment_admin(submission_id):
+    submission = AssignmentSubmission.query.get_or_404(submission_id)
+    if not submission.attachment_data:
+        abort(404)
+    return send_file(
+        BytesIO(submission.attachment_data),
+        mimetype=submission.attachment_mimetype or "image/png",
+    )

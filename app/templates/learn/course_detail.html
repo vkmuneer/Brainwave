@@ -46,6 +46,19 @@
   </div>
 </div>
 
+{% if can_watch %}
+<div class="d-flex gap-2 mb-3">
+  <a href="{{ url_for('learn.questions', course_id=course.id) }}"
+     class="btn btn-outline-secondary flex-fill">
+    <i class="bi bi-patch-question"></i> Questions
+  </a>
+  <a href="{{ url_for('learn.assignments', course_id=course.id) }}"
+     class="btn btn-outline-secondary flex-fill">
+    <i class="bi bi-journal-check"></i> Assignments
+  </a>
+</div>
+{% endif %}
+
 <h6 class="text-bw-teal">Lectures</h6>
 <div class="list-group mb-3">
   {% for v in course.videos if v.published %}

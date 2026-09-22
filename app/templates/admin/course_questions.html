@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Course Questions{% endblock %}
+{% block content %}
+<h4 class="text-bw-teal mb-1"><i class="bi bi-patch-question"></i> Course Questions</h4>
+<p class="text-muted small">
+  Questions from subscribers. An answer is published to everyone taking that course, so
+  write it as you would for the whole class.
+</p>
+
+<ul class="nav nav-pills mb-3">
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if show == 'open' }}"
+       href="{{ url_for('admin.course_questions', show='open') }}">
+      Waiting {% if open_total %}<span class="badge bg-danger rounded-pill">{{ open_total }}</span>{% endif %}
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if show == 'answered' }}"
+       href="{{ url_for('admin.course_questions', show='answered') }}">Answered</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if show == 'all' }}"
+       href="{{ url_for('admin.course_questions', show='all') }}">All</a>
+  </li>
+</ul>
+
+<div class="row g-3">
+  {% for q in questions %}
+  <div class="col-12 col-lg-6">
+    <div class="card bw-card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="fw-bold">{{ q.subscriber.name }}</div>
+            <div class="text-muted small">{{ q.subscriber.mobile }}</div>
+          </div>
+          <span class="badge bg-light text-dark border">{{ q.course.title }}</span>
+        </div>
+
+        <div class="text-muted small mt-2">
+          {{ q.created_at.strftime('%d-%m-%Y %I:%M %p') }}
+          {% if q.video %} &middot; on "{{ q.video.title }}"{% endif %}
+        </div>
+        <p class="mt-1" style="white-space: pre-wrap;">{{ q.body }}</p>
+
+        {% if q.is_answered %}
+        <div class="border-start border-3 ps-3 mb-2">
+          <div class="small text-bw-teal fw-bold">Answered by {{ q.answered_by }}</div>
+          <p class="mb-0 mt-1 small" style="white-space: pre-wrap;">{{ q.answer }}</p>
+        </div>
+        {% endif %}
+
+        <form method="post" action="{{ url_for('admin.course_question_answer', question_id=q.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <textarea name="answer" class="form-control form-control-sm mb-2" rows="3" required
+                    placeholder="{{ 'Replace the answer' if q.is_answered else 'Type your answer' }}"></textarea>
+          <button class="btn btn-sm btn-bw-primary">Publish answer</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12"><p class="text-muted">Nothing here.</p></div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,90 @@
+{% extends "learn/learn_base.html" %}
+{% block title %}{{ assignment.title }}{% endblock %}
+{% block content %}
+<a href="{{ url_for('learn.assignments', course_id=assignment.course_id) }}"
+   class="btn btn-sm btn-outline-secondary mb-3">&larr; Assignments</a>
+
+<div class="card bw-card mb-3">
+  <div class="card-body">
+    <h5 class="text-bw-teal mb-1">{{ assignment.title }}</h5>
+    <div class="text-muted small mb-2">
+      Out of {{ assignment.max_marks | int }}
+      {% if assignment.due_on %} &middot; due {{ assignment.due_on.strftime('%d-%m-%Y') }}{% endif %}
+    </div>
+    {% if assignment.instructions %}
+    <p style="white-space: pre-wrap;">{{ assignment.instructions }}</p>
+    {% endif %}
+  </div>
+</div>
+
+{% if submission and submission.is_evaluated %}
+<div class="card bw-card mb-3 border-success">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center">
+      <h6 class="text-bw-teal mb-0">Your result</h6>
+      <span class="fs-4 fw-bold text-success">
+        {{ submission.marks | int }} / {{ assignment.max_marks | int }}
+      </span>
+    </div>
+    {% if submission.remarks %}
+    <div class="border-start border-3 ps-3 mt-3">
+      <div class="small text-bw-teal fw-bold">{{ submission.evaluated_by }}</div>
+      <p class="mb-0 mt-1" style="white-space: pre-wrap;">{{ submission.remarks }}</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="card bw-card">
+  <div class="card-body">
+    <h6 class="text-bw-teal">
+      {{ 'Your submission' if submission else 'Submit your work' }}
+    </h6>
+
+    {% if submission and submission.is_evaluated %}
+    <p class="text-muted small">
+      This has been marked, so it can no longer be changed.
+    </p>
+    <p style="white-space: pre-wrap;">{{ submission.answer_text }}</p>
+    {% if submission.answer_link %}
+    <a href="{{ submission.answer_link }}" target="_blank" rel="noopener">{{ submission.answer_link }}</a>
+    {% endif %}
+    {% if submission.attachment_data %}
+    <img src="{{ url_for('learn.submission_attachment', submission_id=submission.id) }}"
+         alt="Your attachment" class="img-fluid rounded mt-2">
+    {% endif %}
+    {% else %}
+    <form method="post" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-2">
+        <label class="form-label">Your answer</label>
+        <textarea name="answer_text" class="form-control" rows="5" maxlength="5000"
+                  placeholder="Type your answer">{{ submission.answer_text if submission else '' }}</textarea>
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Photograph of your work <span class="text-muted">(optional)</span></label>
+        <input type="file" name="attachment" class="form-control"
+               accept="image/png,image/jpeg,image/webp">
+        <div class="form-text">PNG, JPG or WebP up to 2 MB.</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Or a link <span class="text-muted">(optional)</span></label>
+        <input type="url" name="answer_link" class="form-control" maxlength="500"
+               value="{{ submission.answer_link if submission else '' }}"
+               placeholder="https://...">
+      </div>
+      <button class="btn btn-bw-primary w-100">
+        {{ 'Update my submission' if submission else 'Submit' }}
+      </button>
+      {% if submission %}
+      <div class="form-text">
+        Submitted {{ submission.submitted_at.strftime('%d-%m-%Y %I:%M %p') }}.
+        You can change it until it is marked.
+      </div>
+      {% endif %}
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

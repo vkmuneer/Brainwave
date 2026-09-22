@@ -1,0 +1,65 @@
+{% extends "learn/learn_base.html" %}
+{% block title %}Questions - {{ course.title }}{% endblock %}
+{% block content %}
+<a href="{{ url_for('learn.course_detail', course_id=course.id) }}"
+   class="btn btn-sm btn-outline-secondary mb-3">&larr; {{ course.title }}</a>
+
+<div class="card bw-card mb-3">
+  <div class="card-body">
+    <h6 class="text-bw-teal">Ask a question</h6>
+    <p class="text-muted small">
+      Stuck on something? Ask here and a teacher will answer. Answers are shared with
+      everyone taking this course, so you may find yours already below.
+    </p>
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-2">
+        <label class="form-label">About a particular lecture <span class="text-muted">(optional)</span></label>
+        <select name="video_id" class="form-select">
+          <option value="">The course in general</option>
+          {% for v in course.videos if v.published %}
+          <option value="{{ v.id }}">{{ loop.index }}. {{ v.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="mb-2">
+        <textarea name="body" class="form-control" rows="3" maxlength="2000" required
+                  placeholder="Type your question"></textarea>
+      </div>
+      <button class="btn btn-bw-primary w-100"><i class="bi bi-send"></i> Send question</button>
+    </form>
+  </div>
+</div>
+
+<h6 class="text-bw-teal">Questions and answers</h6>
+{% for q in questions %}
+<div class="card bw-card mb-2">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start">
+      <div class="small text-muted">
+        {{ q.subscriber.name if q.subscriber_id != me.id else 'You' }}
+        &middot; {{ q.created_at.strftime('%d-%m-%Y') }}
+        {% if q.video %}<br>On: {{ q.video.title }}{% endif %}
+      </div>
+      <span class="badge {{ 'bg-success' if q.is_answered else 'bg-warning text-dark' }}">
+        {{ 'Answered' if q.is_answered else 'Waiting' }}
+      </span>
+    </div>
+    <p class="mb-0 mt-2" style="white-space: pre-wrap;">{{ q.body }}</p>
+
+    {% if q.is_answered %}
+    <div class="border-start border-3 ps-3 mt-3">
+      <div class="small text-bw-teal fw-bold">
+        {{ q.answered_by }}{% if q.answered_at %} &middot; {{ q.answered_at.strftime('%d-%m-%Y') }}{% endif %}
+      </div>
+      <p class="mb-0 mt-1" style="white-space: pre-wrap;">{{ q.answer }}</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% else %}
+<div class="card bw-card"><div class="card-body text-muted">
+  No questions yet. Be the first to ask.
+</div></div>
+{% endfor %}
+{% endblock %}
