@@ -177,6 +177,14 @@ reports, needs 3.10+). If only older versions are offered, the app won't install
    | --- | --- |
    | `SECRET_KEY` | a long random string - see below |
    | `DEFAULT_ADMIN_PASSWORD` | the first admin password |
+   | `SECURE_COOKIES` | `1` once the domain serves https |
+   | `BEHIND_PROXY` | `1` - cPanel runs the app behind a web server |
+
+   `SECURE_COOKIES=1` stops the session cookie ever travelling over plain http;
+   set it only after AutoSSL is working, since without https it breaks every
+   login. `BEHIND_PROXY=1` makes login rate limiting see each visitor's own
+   address instead of the proxy's - without it, one person guessing passwords
+   locks out everyone.
 
    Generate the key with
    `python3 -c "import secrets; print(secrets.token_urlsafe(48))"`, and do not reuse the

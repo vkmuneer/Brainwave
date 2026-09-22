@@ -2,8 +2,9 @@ import os
 from datetime import date
 
 import click
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 
+from config import MIN_PASSWORD_LENGTH
 from config import Config
 from .extensions import db, csrf, login_manager
 
@@ -13,6 +14,13 @@ def create_app(config_class=Config):
     app.config.from_object(config_class)
 
     _check_secret_key(app)
+
+    if app.config.get("BEHIND_PROXY"):
+        from werkzeug.middleware.proxy_fix import ProxyFix
+
+        # Without this every request behind nginx/Passenger appears to come
+        # from the proxy, so one locked-out guesser would lock out everyone.
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
     db.init_app(app)
     csrf.init_app(app)
@@ -55,6 +63,52 @@ def create_app(config_class=Config):
         if current_user.is_admin:
             return redirect(url_for("admin.dashboard"))
         return redirect(url_for("teacher.dashboard"))
+
+    # Sources the browser may load from. Scripts and styles still allow inline
+    # because the pages use inline handlers and style blocks throughout - so
+    # this blocks an attacker-controlled *host*, not inline injection. Jinja's
+    # auto-escaping is what guards against that, and no template bypasses it.
+    CSP = "; ".join(
+        [
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
+            "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com data:",
+            # Charts and the logo are embedded as data: URIs.
+            "img-src 'self' data:",
+            "frame-src https://www.youtube-nocookie.com https://www.youtube.com "
+            "https://player.vimeo.com https://drive.google.com",
+            "form-action 'self'",
+            "base-uri 'self'",
+            "frame-ancestors 'self'",
+            "object-src 'none'",
+        ]
+    )
+
+    @app.after_request
+    def _security_headers(response):
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault(
+            "Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=()"
+        )
+        response.headers.setdefault("Content-Security-Policy", CSP)
+        if request.is_secure:
+            response.headers.setdefault(
+                "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+            )
+        return response
+
+    @app.errorhandler(413)
+    def _too_large(_error):
+        return _error_page(
+            "That file is too large",
+            "Uploads are limited to 8 MB. A logo or a class spreadsheet is far smaller "
+            "than this - check you picked the right file.",
+            "bi-file-earmark-x",
+            413,
+        )
 
     def _error_page(heading, message, icon, code):
         """A dead end should say who you are and offer a way back - Flask's
@@ -454,8 +508,10 @@ def register_cli(app):
             raise click.ClickException(
                 f"No account named '{username}'. Run 'flask --app run list-users' to see them."
             )
-        if len(password) < 4:
-            raise click.ClickException("Password must be at least 4 characters.")
+        if len(password) < MIN_PASSWORD_LENGTH:
+            raise click.ClickException(
+                f"Password must be at least {MIN_PASSWORD_LENGTH} characters."
+            )
 
         user.set_password(password)
         db.session.commit()

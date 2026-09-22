@@ -16,6 +16,7 @@ from flask import (
 from flask_login import login_required, current_user
 from sqlalchemy import func
 
+from config import MIN_PASSWORD_LENGTH
 from ..extensions import db
 from ..models import (
     SchoolClass,
@@ -487,8 +488,8 @@ def password_request_reset(request_id):
     reset_request = PasswordResetRequest.query.get_or_404(request_id)
     new_password = request.form.get("new_password", "")
 
-    if len(new_password) < 4:
-        flash("Password must be at least 4 characters.", "danger")
+    if len(new_password) < MIN_PASSWORD_LENGTH:
+        flash(f"Password must be at least {MIN_PASSWORD_LENGTH} characters.", "danger")
         return redirect(url_for("admin.password_requests"))
 
     reset_request.user.set_password(new_password)
@@ -1520,8 +1521,12 @@ def office_staff():
 
         branch_id = request.form.get("branch_id", type=int)
 
-        if not username or not name or len(password) < 4:
-            flash("Username, name and a password of at least 4 characters are required.", "danger")
+        if not username or not name or len(password) < MIN_PASSWORD_LENGTH:
+            flash(
+                "Username, name and a password of at least "
+                f"{MIN_PASSWORD_LENGTH} characters are required.",
+                "danger",
+            )
         elif not branch_id:
             flash("Choose which branch this coordinator runs.", "danger")
         elif User.query.filter_by(username=username).first():

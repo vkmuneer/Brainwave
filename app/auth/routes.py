@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required, current_user
 
+from config import MIN_PASSWORD_LENGTH
 from ..extensions import db
 from ..models import User, PasswordResetRequest, Settings
 
@@ -133,8 +134,10 @@ def change_password():
 
         if not current_user.check_password(current_pw):
             flash("Current password is incorrect.", "danger")
-        elif len(new_pw) < 4:
-            flash("New password must be at least 4 characters.", "danger")
+        elif len(new_pw) < MIN_PASSWORD_LENGTH:
+            flash(
+                f"New password must be at least {MIN_PASSWORD_LENGTH} characters.", "danger"
+            )
         elif new_pw != confirm_pw:
             flash("New password and confirmation do not match.", "danger")
         else:

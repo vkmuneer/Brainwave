@@ -36,7 +36,7 @@
       </div>
       <div class="mb-3">
         <label class="form-label">Password</label>
-        <input type="text" name="password" class="form-control" minlength="4" required>
+        <input type="text" name="password" class="form-control" minlength="8" required>
         <div class="form-text">Tell them this directly, and ask them to change it after first login.</div>
       </div>
       <button class="btn btn-bw-primary"><i class="bi bi-plus-lg"></i> Create login</button>
@@ -73,7 +73,7 @@
               class="d-flex gap-2 mb-2">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="text" name="password" class="form-control form-control-sm"
-                 placeholder="New password" minlength="4" required>
+                 placeholder="New password" minlength="8" required>
           <button class="btn btn-sm btn-outline-secondary text-nowrap">Reset</button>
         </form>
 
