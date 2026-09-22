@@ -123,10 +123,14 @@ def create_app(config_class=Config):
         _migrate_attendance_sessions(app)
         _backfill_video_approval(app)
         _drop_student_fee_override(app)
+        _backfill_masters(app)
+        # Must follow _ensure_seed_data: both look classes up by name, and on a
+        # brand-new database the classes do not exist until it has run - which
+        # left a fresh install with branches holding no classes and no fee
+        # installment plans.
+        _ensure_seed_data(app)
         _seed_branches(app)
         _seed_fee_schedules(app)
-        _backfill_masters(app)
-        _ensure_seed_data(app)
 
     register_cli(app)
 
