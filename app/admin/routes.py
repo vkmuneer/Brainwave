@@ -1,6 +1,7 @@
 import calendar
 from datetime import date, datetime, timedelta
 from io import BytesIO
+from urllib.parse import urlparse
 
 from flask import (
     Blueprint,
@@ -1812,6 +1813,31 @@ def mark_message_sent(message_id):
 
 
 # ---------------------------------------------------------------- settings
+
+def _safe_social_url(raw):
+    """A public, clickable URL, or empty.
+
+    Only http(s) is allowed through: the value lands in an href shown to
+    every public visitor, so a 'javascript:' or 'data:' scheme must never
+    be stored. A bare 'instagram.com/brainwave' is treated as https.
+    """
+    raw = (raw or '').strip()
+    if not raw:
+        return ''
+    # Parse before touching the string: urlparse reads "javascript:alert(1)"
+    # as scheme=javascript, so a dangerous scheme is caught here rather than
+    # being disguised by a prepended "https://".
+    parsed = urlparse(raw)
+    if parsed.scheme and parsed.scheme not in ('http', 'https'):
+        return ''
+    if not parsed.scheme:
+        raw = 'https://' + raw
+        parsed = urlparse(raw)
+    if parsed.scheme not in ('http', 'https') or not parsed.netloc:
+        return ''
+    return raw[:255]
+
+
 @admin_bp.route("/settings", methods=["GET", "POST"])
 @login_required
 @admin_required
@@ -1823,6 +1849,9 @@ def settings():
         settings_obj.address = request.form.get("address", "").strip()
         settings_obj.phone = request.form.get("phone", "").strip()
         settings_obj.email = request.form.get("email", "").strip()
+        settings_obj.instagram_url = _safe_social_url(request.form.get("instagram_url"))
+        settings_obj.facebook_url = _safe_social_url(request.form.get("facebook_url"))
+        settings_obj.youtube_url = _safe_social_url(request.form.get("youtube_url"))
         settings_obj.upi_id = request.form.get("upi_id", "").strip()
         settings_obj.upi_payee_name = request.form.get("upi_payee_name", "").strip()
         settings_obj.student_login_enabled = bool(request.form.get("student_login_enabled"))

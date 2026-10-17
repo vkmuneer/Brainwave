@@ -127,6 +127,19 @@ def test_signed_in_staff_keep_the_menu_everywhere(client, data, url):
     assert 'navbar-nav me-auto' in body, url
 
 
+@pytest.mark.parametrize("url", ["/home", "/learn/", "/admin/dashboard"])
+def test_a_page_showing_the_menu_also_styles_it(client, data, url):
+    """The menu needs style.css to sit straight.
+
+    The home page carried the menu without the stylesheet, so its icons and
+    labels fell off each other's baseline - present, but ragged.
+    """
+    login(client, "admin", "admin123")
+    body = client.get(url, follow_redirects=True).get_data(as_text=True)
+    assert "navbar-nav me-auto" in body, url
+    assert "css/style.css" in body, url
+
+
 @pytest.mark.parametrize("url", ["/home", "/learn/"])
 def test_visitors_do_not_see_the_staff_menu(client, data, url):
     body = client.get(url, follow_redirects=True).get_data(as_text=True)

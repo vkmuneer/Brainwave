@@ -25,6 +25,11 @@ body {
 
 .bw-navbar {
   background: var(--bw-gradient);
+  /* Above page furniture that comes later in the document - the home page's
+     sticky header sits at 1030, and without this its backdrop swallowed the
+     open dropdowns. */
+  position: relative;
+  z-index: 1040;
 }
 
 .bw-navbar .navbar-brand,

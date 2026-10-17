@@ -38,6 +38,24 @@
       </div>
 
       <hr>
+      <h6 class="text-bw-teal">Social Media</h6>
+      <p class="text-muted small mb-3">Shown as clickable icons in the website footer. Leave a field blank to hide that icon.</p>
+      <div class="mb-3">
+        <label class="form-label"><i class="bi bi-instagram me-1"></i>Instagram</label>
+        <input type="url" name="instagram_url" class="form-control" maxlength="255"
+               placeholder="https://instagram.com/brainwaveacademy" value="{{ settings.instagram_url or '' }}">
+      </div>
+      <div class="mb-3">
+        <label class="form-label"><i class="bi bi-facebook me-1"></i>Facebook</label>
+        <input type="url" name="facebook_url" class="form-control" maxlength="255"
+               placeholder="https://facebook.com/brainwaveacademy" value="{{ settings.facebook_url or '' }}">
+      </div>
+      <div class="mb-3">
+        <label class="form-label"><i class="bi bi-youtube me-1"></i>YouTube</label>
+        <input type="url" name="youtube_url" class="form-control" maxlength="255"
+               placeholder="https://youtube.com/@brainwaveacademy" value="{{ settings.youtube_url or '' }}">
+      </div>
+      <hr>
       <h6 class="text-bw-teal">Logo</h6>
       <div class="d-flex align-items-center gap-3 mb-2">
         <img src="{{ url_for('public.logo') }}" alt="Current logo"

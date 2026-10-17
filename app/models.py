@@ -386,6 +386,12 @@ class Settings(db.Model):
     phone = db.Column(db.String(80))
     email = db.Column(db.String(120))
 
+    # Social profiles shown as clickable icons in the public site footer.
+    # Empty means that icon is simply not drawn.
+    instagram_url = db.Column(db.String(255))
+    facebook_url = db.Column(db.String(255))
+    youtube_url = db.Column(db.String(255))
+
     # Held in the database rather than as a file on disk so that one backup of
     # brainwave.db captures the branding too, and so a redeploy onto a fresh
     # filesystem does not silently lose the logo.
@@ -421,6 +427,16 @@ class Settings(db.Model):
         if self.email:
             parts.append(self.email)
         return "  |  ".join(parts)
+
+    @property
+    def social_links(self):
+        """Non-empty social profiles as (label, bootstrap-icon, url) tuples."""
+        pairs = [
+            ("Instagram", "bi-instagram", self.instagram_url),
+            ("Facebook", "bi-facebook", self.facebook_url),
+            ("YouTube", "bi-youtube", self.youtube_url),
+        ]
+        return [(label, icon, url) for label, icon, url in pairs if url]
 
     @classmethod
     def get(cls):
