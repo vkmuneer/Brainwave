@@ -161,6 +161,16 @@ class User(db.Model, UserMixin):
     name = db.Column(db.String(120), nullable=False)
     active = db.Column(db.Boolean, default=True, nullable=False)
 
+    # Contact details the user maintains themselves. email also receives the
+    # password-reset link.
+    phone = db.Column(db.String(20))
+    email = db.Column(db.String(120))
+
+    # Avatar, kept in the database like the logo and thumbnails so one backup
+    # of brainwave.db carries it.
+    photo_data = db.Column(db.LargeBinary)
+    photo_mimetype = db.Column(db.String(40))
+
     # Which branch this account runs. NULL means every branch, which is what an
     # admin gets; an office coordinator is expected to have one.
     branch_id = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True)
@@ -181,6 +191,10 @@ class User(db.Model, UserMixin):
     @property
     def is_admin(self):
         return self.role == "admin"
+
+    @property
+    def has_photo(self):
+        return self.photo_data is not None
 
     @property
     def is_office(self):

@@ -7,6 +7,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from config import MIN_PASSWORD_LENGTH
 from ..extensions import db
 from ..models import User, PasswordResetRequest, Settings
+from ..utils.images import read_image_upload
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -122,6 +123,44 @@ def logout():
     logout_user()
     flash("You have been logged out.", "info")
     return redirect(url_for("auth.login"))
+
+
+@auth_bp.route("/account/profile", methods=["GET", "POST"])
+@login_required
+def profile():
+    """A user maintains their own name, contact details and photo here."""
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        if not name:
+            flash("Name cannot be blank.", "danger")
+            return redirect(url_for("auth.profile"))
+        current_user.name = name[:120]
+        current_user.phone = request.form.get("phone", "").strip()[:20]
+        current_user.email = request.form.get("email", "").strip()[:120]
+
+        if request.form.get("remove_photo"):
+            current_user.photo_data = None
+            current_user.photo_mimetype = None
+        else:
+            data, mimetype, error = read_image_upload(request.files.get("photo"))
+            if error:
+                flash(error, "danger")
+                return redirect(url_for("auth.profile"))
+            if data is not None:
+                current_user.photo_data = data
+                current_user.photo_mimetype = mimetype
+
+        # A teacher's public-facing record mirrors the account name and phone,
+        # so the faculty section and their own profile never disagree.
+        if current_user.role == "teacher" and current_user.teacher is not None:
+            current_user.teacher.name = current_user.name
+            current_user.teacher.phone = current_user.phone
+
+        db.session.commit()
+        flash("Your profile has been updated.", "success")
+        return redirect(url_for("auth.profile"))
+
+    return render_template("account_profile.html")
 
 
 @auth_bp.route("/account/change-password", methods=["GET", "POST"])

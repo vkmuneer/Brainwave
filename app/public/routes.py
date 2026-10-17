@@ -124,6 +124,24 @@ def lecture_thumb(video_id):
     return _serve_thumbnail(CourseVideo.query.get(video_id))
 
 
+@public_bp.route("/photo/staff/<int:user_id>")
+def staff_photo(user_id):
+    """A staff member's profile photo, or a 404 so the page shows its initials
+    placeholder instead. Public because the faculty section on the home page
+    shows these - a staff avatar is not sensitive."""
+    from ..models import User
+
+    user = User.query.get(user_id)
+    if user is None or not user.photo_data:
+        abort(404)
+    response = send_file(
+        BytesIO(user.photo_data),
+        mimetype=user.photo_mimetype or "image/png",
+    )
+    response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 @public_bp.route("/logo")
 def logo():
     """Serves the uploaded academy logo, falling back to the bundled one.

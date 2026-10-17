@@ -153,10 +153,17 @@
       </form>
       <ul class="navbar-nav bw-account-nav">
         <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-            <i class="bi bi-person-circle"></i> {{ current_user.name }}
+          <a class="nav-link dropdown-toggle d-inline-flex align-items-center gap-2" href="#" role="button" data-bs-toggle="dropdown">
+            {% if current_user.has_photo %}
+            <img src="{{ url_for('public.staff_photo', user_id=current_user.id) }}" alt=""
+                 class="rounded-circle" style="width:26px;height:26px;object-fit:cover;">
+            {% else %}
+            <i class="bi bi-person-circle"></i>
+            {% endif %}
+            {{ current_user.name }}
           </a>
           <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" href="{{ url_for('auth.profile') }}"><i class="bi bi-person-badge"></i> My Profile</a></li>
             {% if current_user.is_admin %}
             <li><a class="dropdown-item" href="{{ url_for('admin.settings') }}"><i class="bi bi-gear"></i> Settings</a></li>
             {% endif %}
