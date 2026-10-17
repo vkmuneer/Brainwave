@@ -21,6 +21,11 @@ def home():
     from ..models import SchoolClass, Subject, Teacher, Course, CLASS_ORDER
 
     settings = Settings.get()
+    faculty = (
+        Teacher.query.filter_by(active=True, show_on_website=True)
+        .order_by(Teacher.display_order, Teacher.name)
+        .all()
+    )
     classes = sorted(
         SchoolClass.query.all(),
         key=lambda c: CLASS_ORDER.index(c.name) if c.name in CLASS_ORDER else 99,
@@ -88,6 +93,7 @@ def home():
         features=features,
         courses=Course.query.filter_by(published=True).order_by(Course.title).limit(6).all(),
         portal_open=settings.student_login_enabled,
+        faculty=faculty,
     )
 
 

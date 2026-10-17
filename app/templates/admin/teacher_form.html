@@ -61,6 +61,32 @@
           </div>
         </div>
       </div>
+
+      <hr>
+      <h6 class="text-bw-teal">Website</h6>
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" name="show_on_website" id="show_on_website"
+               {{ 'checked' if teacher and teacher.show_on_website }}>
+        <label class="form-check-label" for="show_on_website">
+          Feature this teacher on the public home page
+        </label>
+      </div>
+      <div class="row">
+        <div class="col-12 col-sm-8 mb-3">
+          <label class="form-label">Designation <span class="text-muted">(shown on website)</span></label>
+          <input type="text" name="designation" class="form-control" maxlength="120"
+                 placeholder="Physics Faculty / Principal"
+                 value="{{ teacher.designation if teacher else '' }}">
+        </div>
+        <div class="col-12 col-sm-4 mb-3">
+          <label class="form-label">Display order</label>
+          <input type="number" name="display_order" class="form-control" min="1" max="999"
+                 value="{{ teacher.display_order if teacher else 100 }}">
+          <div class="form-text">Lower shows first.</div>
+        </div>
+      </div>
+      <p class="text-muted small">The photo comes from the teacher's own profile. Ask them to upload one from My Profile, or leave it and their initials show.</p>
+
       <div class="mt-4">
         <button type="submit" class="btn btn-bw-primary">Save Teacher</button>
         <a href="{{ url_for('admin.teachers') }}" class="btn btn-outline-secondary">Cancel</a>

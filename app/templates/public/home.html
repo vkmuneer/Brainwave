@@ -119,6 +119,27 @@
     .stat { text-align: center; }
     .stat .n { font-size: 2.2rem; font-weight: 800; color: var(--dark-teal); line-height: 1; }
     .stat .l { color: var(--muted); font-size: .9rem; margin-top: .35rem; }
+    .faculty-card {
+      background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+      padding: 1.6rem 1rem; text-align: center; height: 100%;
+      transition: transform .18s ease, box-shadow .18s ease;
+    }
+    .faculty-card:hover { transform: translateY(-4px); box-shadow: 0 14px 34px rgba(20,32,46,.10); }
+    .faculty-photo {
+      width: 104px; height: 104px; border-radius: 50%; object-fit: cover;
+      margin: 0 auto .9rem; display: block; border: 3px solid var(--teal);
+    }
+    .faculty-initials {
+      width: 104px; height: 104px; border-radius: 50%; margin: 0 auto .9rem;
+      display: grid; place-items: center; font-size: 2.4rem; font-weight: 800; color: #fff;
+      background: linear-gradient(135deg, var(--teal), var(--blue));
+    }
+    .faculty-name { font-weight: 800; color: var(--blue); }
+    .faculty-desig { color: var(--teal); font-weight: 600; font-size: .92rem; }
+    .faculty-sub { color: var(--muted); font-size: .85rem; }
+    @media (prefers-reduced-motion: reduce) {
+      .faculty-card, .faculty-card:hover { transition: none; transform: none; }
+    }
 
     footer { background: var(--blue); color: rgba(255,255,255,.82); padding: 3rem 0 2rem; }
     footer a { color: #fff; text-decoration: none; }
@@ -189,6 +210,7 @@
     <div class="bw-top-links">
       <a href="#classes" class="btn btn-quiet d-none d-lg-block">Classes</a>
       <a href="#courses" class="btn btn-quiet d-none d-md-block">Courses</a>
+      {% if faculty %}<a href="#faculty" class="btn btn-quiet d-none d-lg-block">Faculty</a>{% endif %}
       <a href="#contact" class="btn btn-quiet d-none d-md-block">Contact</a>
       <a href="{{ url_for('learn.catalogue') }}" class="btn btn-outline-secondary">Video Courses</a>
       <a href="{{ url_for('portal.login') if portal_open else url_for('auth.login') }}"
@@ -333,6 +355,34 @@
     </div>
   </div>
 </section>
+
+{% if faculty %}
+<section id="faculty" class="section-wash">
+  <div class="container">
+    <div class="eyebrow-dark">The people who teach</div>
+    <h2 class="mb-2">Our faculty &amp; team</h2>
+    <p class="lead-muted mb-4" style="max-width: 46rem;">
+      Experienced teachers who know every student by name.
+    </p>
+    <div class="row g-4">
+      {% for t in faculty %}
+      <div class="col-6 col-md-4 col-lg-3">
+        <div class="faculty-card reveal">
+          {% if t.has_photo %}
+          <img src="{{ url_for('public.staff_photo', user_id=t.user_id) }}" alt="{{ t.name }}" class="faculty-photo">
+          {% else %}
+          <div class="faculty-initials">{{ t.name[0]|upper }}</div>
+          {% endif %}
+          <div class="faculty-name">{{ t.name }}</div>
+          {% if t.designation %}<div class="faculty-desig">{{ t.designation }}</div>{% endif %}
+          {% if t.subject_names %}<div class="faculty-sub mt-1">{{ t.subject_names }}</div>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
 
 <section id="contact">
   <div class="container">

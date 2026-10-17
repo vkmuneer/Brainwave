@@ -459,6 +459,9 @@ def teacher_form(teacher_id=None):
                 teacher.user.set_password(password)
 
         teacher.phone = phone
+        teacher.show_on_website = bool(request.form.get("show_on_website"))
+        teacher.designation = request.form.get("designation", "").strip()[:120]
+        teacher.display_order = request.form.get("display_order", type=int) or 100
         teacher.divisions = Division.query.filter(Division.id.in_(division_ids)).all()
         teacher.subjects = Subject.query.filter(Subject.id.in_(subject_ids)).all()
 

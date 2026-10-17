@@ -249,8 +249,18 @@ class Teacher(db.Model):
     phone = db.Column(db.String(20))
     active = db.Column(db.Boolean, default=True, nullable=False)
 
+    # Public faculty section on the home page. Off by default so a new teacher
+    # is not published until the admin chooses to feature them.
+    show_on_website = db.Column(db.Boolean, default=False, nullable=False)
+    designation = db.Column(db.String(120))   # e.g. "Principal", "Physics Faculty"
+    display_order = db.Column(db.Integer, default=100, nullable=False)
+
     divisions = db.relationship("Division", secondary=teacher_divisions, backref="teachers")
     subjects = db.relationship("Subject", secondary=teacher_subjects, backref="teachers")
+
+    @property
+    def has_photo(self):
+        return self.user is not None and self.user.photo_data is not None
 
     @property
     def subject_names(self):
