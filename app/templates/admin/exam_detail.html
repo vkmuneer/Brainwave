@@ -17,19 +17,48 @@
       <div class="card-header bg-white fw-bold text-bw-teal">Subjects &amp; Marks Configuration</div>
       <ul class="list-group list-group-flush">
         {% for es in exam.exam_subjects %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-          <div>
-            <div class="fw-bold">{{ es.subject.name }}</div>
-            <div class="small text-muted">Max: {{ es.max_marks|int }} &middot; Pass: {{ es.pass_marks|int }}</div>
+        <li class="list-group-item">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <div class="fw-bold">{{ es.subject.name }}</div>
+              <div class="small text-muted">Max: {{ es.max_marks|int }} &middot; Pass: {{ es.pass_marks|int }}</div>
+            </div>
+            <div class="d-flex gap-2 align-items-center">
+              <a href="{{ url_for('admin.exam_marks', exam_id=exam.id, exam_subject_id=es.id) }}" class="btn btn-sm btn-bw-primary">Enter Marks</a>
+              {% if current_user.is_admin %}
+              <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse"
+                      data-bs-target="#edit-es-{{ es.id }}" aria-expanded="false" title="Edit marks">
+                <i class="bi bi-pencil"></i>
+              </button>
+              {% endif %}
+              <form method="post" action="{{ url_for('admin.delete_exam_subject', exam_id=exam.id, exam_subject_id=es.id) }}"
+                    onsubmit="return confirm('Remove {{ es.subject.name }} from this exam? Its marks will be deleted.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x"></i></button>
+              </form>
+            </div>
           </div>
-          <div class="d-flex gap-2 align-items-center">
-            <a href="{{ url_for('admin.exam_marks', exam_id=exam.id, exam_subject_id=es.id) }}" class="btn btn-sm btn-bw-primary">Enter Marks</a>
-            <form method="post" action="{{ url_for('admin.delete_exam_subject', exam_id=exam.id, exam_subject_id=es.id) }}"
-                  onsubmit="return confirm('Remove {{ es.subject.name }} from this exam? Its marks will be deleted.');">
+          {% if current_user.is_admin %}
+          <div class="collapse mt-2" id="edit-es-{{ es.id }}">
+            <form method="post" action="{{ url_for('admin.edit_exam_subject', exam_id=exam.id, exam_subject_id=es.id) }}"
+                  class="row g-2 align-items-end">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x"></i></button>
+              <div class="col-6 col-sm-4">
+                <label class="form-label small mb-0">Max mark</label>
+                <input type="number" step="0.5" min="1" name="max_marks" class="form-control form-control-sm"
+                       value="{{ es.max_marks|int }}" required>
+              </div>
+              <div class="col-6 col-sm-4">
+                <label class="form-label small mb-0">Pass mark</label>
+                <input type="number" step="0.5" min="0" name="pass_marks" class="form-control form-control-sm"
+                       value="{{ es.pass_marks|int }}" required>
+              </div>
+              <div class="col-12 col-sm-4">
+                <button type="submit" class="btn btn-sm btn-bw-primary w-100">Save marks</button>
+              </div>
             </form>
           </div>
+          {% endif %}
         </li>
         {% else %}
         <li class="list-group-item text-muted">No subjects added yet.</li>

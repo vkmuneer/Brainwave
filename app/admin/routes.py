@@ -2246,6 +2246,42 @@ def add_exam_subject(exam_id):
     return redirect(url_for("admin.exam_detail", exam_id=exam.id))
 
 
+@admin_bp.route("/exams/<int:exam_id>/subjects/<int:exam_subject_id>/edit", methods=["POST"])
+@login_required
+@admin_required
+def edit_exam_subject(exam_id, exam_subject_id):
+    """Change a subject's max and pass marks after it was added to the exam."""
+    exam = Exam.query.get_or_404(exam_id)
+    ensure_class_visible(exam.class_id)
+    exam_subject = ExamSubject.query.filter_by(id=exam_subject_id, exam_id=exam.id).first_or_404()
+
+    max_marks = request.form.get("max_marks", type=float)
+    pass_marks = request.form.get("pass_marks", type=float)
+
+    if max_marks is None or max_marks <= 0:
+        flash("Max mark must be a number greater than zero.", "danger")
+    elif pass_marks is None or pass_marks < 0:
+        flash("Pass mark must be zero or more.", "danger")
+    elif pass_marks > max_marks:
+        flash("Pass mark cannot be higher than the max mark.", "danger")
+    else:
+        # Lowering the max below a mark already entered would leave that student
+        # scoring more than the subject allows, so refuse rather than hide it.
+        over = [m for m in exam_subject.marks if m.marks_obtained > max_marks]
+        if over:
+            flash(
+                f"Cannot set max to {max_marks:g}: {len(over)} student(s) already have "
+                f"more than that recorded. Correct those marks first.",
+                "danger",
+            )
+        else:
+            exam_subject.max_marks = max_marks
+            exam_subject.pass_marks = pass_marks
+            db.session.commit()
+            flash(f"{exam_subject.subject.name}: max and pass marks updated.", "success")
+    return redirect(url_for("admin.exam_detail", exam_id=exam.id))
+
+
 @admin_bp.route("/exams/<int:exam_id>/subjects/<int:exam_subject_id>/delete", methods=["POST"])
 @login_required
 @admin_required
