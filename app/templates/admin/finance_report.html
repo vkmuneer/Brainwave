@@ -11,6 +11,17 @@
 {% set active = 'finance' %}
 {% include "admin/_fee_nav.html" %}
 
+{% if branches %}
+<div class="btn-group btn-group-sm mb-3 no-print" role="group" aria-label="Branch filter">
+  <a href="{{ url_for('admin.finance_report', period=period, year=year, month=month) }}"
+     class="btn {{ 'btn-bw-primary' if not selected_branch_id else 'btn-outline-secondary' }}">All branches</a>
+  {% for b in branches %}
+  <a href="{{ url_for('admin.finance_report', period=period, year=year, month=month, branch=b.id) }}"
+     class="btn {{ 'btn-bw-primary' if selected_branch_id == b.id else 'btn-outline-secondary' }}">{{ b.name }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+
 <ul class="nav nav-tabs mb-3">
   <li class="nav-item">
     <a class="nav-link {{ 'active' if period == 'daily' }}" href="{{ url_for('admin.finance_report', period='daily') }}">Daily</a>
@@ -26,6 +37,7 @@
 {% if period == 'daily' %}
 <form method="get" class="row g-2 mb-3">
   <input type="hidden" name="period" value="daily">
+  {% if selected_branch_id %}<input type="hidden" name="branch" value="{{ selected_branch_id }}">{% endif %}
   <div class="col-6 col-md-3">
     <input type="date" name="date" class="form-control" value="{{ start.isoformat() }}" onchange="this.form.submit()">
   </div>
@@ -33,6 +45,7 @@
 {% elif period == 'monthly' %}
 <form method="get" class="row g-2 mb-3">
   <input type="hidden" name="period" value="monthly">
+  {% if selected_branch_id %}<input type="hidden" name="branch" value="{{ selected_branch_id }}">{% endif %}
   <div class="col-6 col-md-3">
     <select name="month" class="form-select" onchange="this.form.submit()">
       {% for m in range(1, 13) %}
@@ -51,6 +64,7 @@
 {% else %}
 <form method="get" class="row g-2 mb-3">
   <input type="hidden" name="period" value="range">
+  {% if selected_branch_id %}<input type="hidden" name="branch" value="{{ selected_branch_id }}">{% endif %}
   <div class="col-6 col-md-3">
     <label class="form-label small mb-0">From</label>
     <input type="date" name="start" class="form-control" value="{{ start.isoformat() }}">

@@ -58,6 +58,8 @@ from ..utils.scope import (
     ensure_division_visible,
     ensure_class_visible,
     current_branch,
+    resolved_class_ids,
+    scope_payments,
 )
 from ..utils.attendance import (
     resolve_session,
@@ -128,19 +130,31 @@ def _school_options(student=None):
 @login_required
 @office_required
 def dashboard():
-    students = limit_students(Student.query.filter_by(active=True)).all()
+    # An admin may view one branch at a time; an office coordinator is always
+    # held to their own branch (resolved_class_ids enforces that).
+    branch_id = request.args.get("branch", type=int)
+    class_ids = resolved_class_ids(branch_id)
+
+    student_query = Student.query.filter_by(active=True)
+    if class_ids is not None:
+        student_query = student_query.filter(Student.class_id.in_(class_ids or [-1]))
+    students = student_query.all()
+
     total_expected = sum(s.total_fee for s in students)
     total_collected = sum(s.total_paid for s in students)
     total_pending = round(total_expected - total_collected, 2)
 
     today = date.today()
-    today_collection = (
-        db.session.query(func.coalesce(func.sum(FeePayment.amount), 0))
-        .filter(FeePayment.payment_date == today)
-        .scalar()
-    )
-    today_absentees = Attendance.query.filter_by(date=today, status="absent").count()
-    today_present = Attendance.query.filter_by(date=today, status="present").count()
+    collection_query = FeePayment.query.filter(FeePayment.payment_date == today)
+    attend = Attendance.query.filter(Attendance.date == today)
+    if class_ids is not None:
+        student_ids = [s.id for s in students] or [-1]
+        collection_query = collection_query.filter(FeePayment.student_id.in_(student_ids))
+        attend = attend.filter(Attendance.student_id.in_(student_ids))
+
+    today_collection = sum(p.amount for p in collection_query.all())
+    today_absentees = attend.filter(Attendance.status == "absent").count()
+    today_present = attend.filter(Attendance.status == "present").count()
 
     pending_students = sorted(
         [s for s in students if s.pending_fee > 0], key=lambda s: s.pending_fee, reverse=True
@@ -157,7 +171,11 @@ def dashboard():
         today_absentees=today_absentees,
         today_present=today_present,
         pending_students=pending_students,
-        classes=_classes_sorted(),
+        classes=visible_classes(_classes_sorted()) if class_ids is None else [
+            c for c in _classes_sorted() if c.id in class_ids
+        ],
+        branches=Branch.query.order_by(Branch.name).all() if current_user.is_admin else [],
+        selected_branch_id=branch_id,
     )
 
 
@@ -665,9 +683,15 @@ def _compute_finance_report(args):
         label = start.strftime("%d-%m-%Y")
 
     q = args.get("q", "").strip()
+    branch_id = args.get("branch", type=int)
+    class_ids = resolved_class_ids(branch_id)
+
     payments_query = FeePayment.query.filter(
         FeePayment.payment_date >= start, FeePayment.payment_date <= end
     )
+    # Keep each branch's collection to itself - an office coordinator must not
+    # see the other branch's receipts, and an admin can pick one branch.
+    payments_query = scope_payments(payments_query, class_ids)
     if q:
         like = f"%{q}%"
         payments_query = payments_query.join(Student).filter(
@@ -695,6 +719,8 @@ def _compute_finance_report(args):
         "total": total,
         "by_mode": by_mode,
         "by_class": by_class,
+        "branches": Branch.query.order_by(Branch.name).all() if current_user.is_admin else [],
+        "selected_branch_id": branch_id,
     }
 
 

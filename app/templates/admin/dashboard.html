@@ -1,7 +1,24 @@
 {% extends "base.html" %}
 {% block title %}Dashboard - Brainwave Academy{% endblock %}
 {% block content %}
-<h4 class="text-bw-teal mb-3">Admin Dashboard</h4>
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+  <h4 class="text-bw-teal mb-0">
+    Admin Dashboard
+    {% if selected_branch_id and branches %}
+      {% for b in branches if b.id == selected_branch_id %}<small class="text-muted">&middot; {{ b.name }}</small>{% endfor %}
+    {% endif %}
+  </h4>
+  {% if branches %}
+  <div class="btn-group btn-group-sm" role="group" aria-label="Branch filter">
+    <a href="{{ url_for('admin.dashboard') }}"
+       class="btn {{ 'btn-bw-primary' if not selected_branch_id else 'btn-outline-secondary' }}">All branches</a>
+    {% for b in branches %}
+    <a href="{{ url_for('admin.dashboard', branch=b.id) }}"
+       class="btn {{ 'btn-bw-primary' if selected_branch_id == b.id else 'btn-outline-secondary' }}">{{ b.name }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
 
 <div class="row g-3 mb-3">
   <div class="col-6 col-md-3">
