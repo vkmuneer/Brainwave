@@ -994,3 +994,25 @@ class AssignmentSubmission(db.Model):
 
     def __repr__(self):
         return f"<AssignmentSubmission {self.assignment_id}/{self.subscriber_id}>"
+
+
+class GalleryImage(db.Model):
+    """A photo shown on the public gallery page - events, campus, results day.
+
+    Uploaded by admin or office staff. 'published' hides one without deleting
+    it; the image bytes live in the database like the logo and thumbnails so a
+    single backup of brainwave.db carries the whole gallery.
+    """
+
+    __tablename__ = "gallery_images"
+
+    id = db.Column(db.Integer, primary_key=True)
+    image_data = db.Column(db.LargeBinary, nullable=False)
+    image_mimetype = db.Column(db.String(40), nullable=False)
+    caption = db.Column(db.String(200))
+    uploaded_by = db.Column(db.String(120))
+    published = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    def __repr__(self):
+        return f"<GalleryImage {self.id}>"

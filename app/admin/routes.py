@@ -46,6 +46,7 @@ from ..models import (
     CourseQuestion,
     Assignment,
     AssignmentSubmission,
+    GalleryImage,
 )
 from ..utils.decorators import admin_required, office_required
 from ..utils.scope import (
@@ -2781,3 +2782,53 @@ def submission_attachment_admin(submission_id):
         BytesIO(submission.attachment_data),
         mimetype=submission.attachment_mimetype or "image/png",
     )
+
+
+# ------------------------------------------------------------------ gallery
+@admin_bp.route("/gallery", methods=["GET", "POST"])
+@login_required
+@office_required
+def gallery():
+    """Admin and office staff add photos to the public gallery."""
+    if request.method == "POST":
+        data, mimetype, error = read_image_upload(request.files.get("image"))
+        if error:
+            flash(error, "danger")
+            return redirect(url_for("admin.gallery"))
+        if data is None:
+            flash("Choose an image to add.", "danger")
+            return redirect(url_for("admin.gallery"))
+        db.session.add(GalleryImage(
+            image_data=data,
+            image_mimetype=mimetype,
+            caption=request.form.get("caption", "").strip()[:200],
+            uploaded_by=current_user.name,
+        ))
+        db.session.commit()
+        flash("Photo added to the gallery.", "success")
+        return redirect(url_for("admin.gallery"))
+
+    images = GalleryImage.query.order_by(GalleryImage.created_at.desc()).all()
+    return render_template("admin/gallery.html", images=images)
+
+
+@admin_bp.route("/gallery/<int:image_id>/toggle", methods=["POST"])
+@login_required
+@office_required
+def gallery_toggle(image_id):
+    image = GalleryImage.query.get_or_404(image_id)
+    image.published = not image.published
+    db.session.commit()
+    flash("Gallery updated.", "success")
+    return redirect(url_for("admin.gallery"))
+
+
+@admin_bp.route("/gallery/<int:image_id>/delete", methods=["POST"])
+@login_required
+@office_required
+def gallery_delete(image_id):
+    image = GalleryImage.query.get_or_404(image_id)
+    db.session.delete(image)
+    db.session.commit()
+    flash("Photo removed from the gallery.", "success")
+    return redirect(url_for("admin.gallery"))

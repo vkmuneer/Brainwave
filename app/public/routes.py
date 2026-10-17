@@ -142,6 +142,31 @@ def staff_photo(user_id):
     return response
 
 
+@public_bp.route("/gallery")
+def gallery():
+    """Public gallery of published photos."""
+    from ..models import GalleryImage
+
+    images = (
+        GalleryImage.query.filter_by(published=True)
+        .order_by(GalleryImage.created_at.desc())
+        .all()
+    )
+    return render_template("public/gallery.html", settings=Settings.get(), images=images)
+
+
+@public_bp.route("/gallery/image/<int:image_id>")
+def gallery_image(image_id):
+    from ..models import GalleryImage
+
+    image = GalleryImage.query.get(image_id)
+    if image is None or not image.image_data:
+        abort(404)
+    response = send_file(BytesIO(image.image_data), mimetype=image.image_mimetype or "image/jpeg")
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return response
+
+
 @public_bp.route("/logo")
 def logo():
     """Serves the uploaded academy logo, falling back to the bundled one.

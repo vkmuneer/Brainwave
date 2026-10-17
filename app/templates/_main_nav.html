@@ -92,6 +92,10 @@
           </ul>
         </li>
 
+        {% if current_user.is_office %}
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.gallery') }}"><i class="bi bi-images"></i> Gallery</a></li>
+        {% endif %}
+
         {% if current_user.is_admin %}
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
@@ -105,6 +109,7 @@
             <li><a class="dropdown-item" href="{{ url_for('admin.office_staff') }}">Office Staff</a></li>
             <li><a class="dropdown-item" href="{{ url_for('admin.classes') }}">Classes &amp; Fee Plans</a></li>
             <li><a class="dropdown-item" href="{{ url_for('admin.masters') }}">Master Data</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('admin.gallery') }}">Gallery</a></li>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item" href="{{ url_for('admin.courses') }}">Subscription Courses</a></li>
             <li>
