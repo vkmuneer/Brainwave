@@ -123,15 +123,26 @@
     footer { background: var(--blue); color: rgba(255,255,255,.82); padding: 3rem 0 2rem; }
     footer a { color: #fff; text-decoration: none; }
     footer a:hover { text-decoration: underline; }
-    .social-icons { display: flex; gap: .6rem; margin-top: 1rem; }
+    .social-icons { display: flex; gap: .7rem; margin-top: 1rem; }
     .social-icons a {
-      width: 40px; height: 40px; border-radius: 50%;
-      display: grid; place-items: center; font-size: 1.15rem;
-      color: #fff; background: rgba(255,255,255,.12);
-      border: 1px solid rgba(255,255,255,.22);
-      transition: background .18s ease, transform .18s ease;
+      width: 46px; height: 46px; border-radius: 12px;
+      display: grid; place-items: center; font-size: 1.5rem;
+      color: #fff; text-decoration: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,.18);
+      transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
     }
-    .social-icons a:hover { background: var(--teal); transform: translateY(-2px); text-decoration: none; }
+    .social-icons a:hover {
+      transform: translateY(-3px); text-decoration: none;
+      box-shadow: 0 8px 20px rgba(0,0,0,.28); filter: brightness(1.07);
+    }
+    /* Each platform in its own brand colour so the badge is recognisable
+       at a glance - Instagram's gradient, YouTube red, Facebook blue. */
+    .social-icons a.soc-bi-instagram {
+      background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%,
+        #fd5949 45%, #d6249f 60%, #285AEB 90%);
+    }
+    .social-icons a.soc-bi-youtube  { background: #ff0000; }
+    .social-icons a.soc-bi-facebook { background: #1877f2; }
     @media (prefers-reduced-motion: reduce) {
       .social-icons a { transition: none; }
       .social-icons a:hover { transform: none; }
@@ -383,7 +394,7 @@
         <div class="social-icons">
           {% for label, icon, url in settings.social_links %}
           <a href="{{ url }}" target="_blank" rel="noopener noreferrer"
-             aria-label="{{ label }}" title="{{ label }}"><i class="bi {{ icon }}"></i></a>
+             class="soc-{{ icon }}" aria-label="{{ label }}" title="{{ label }}"><i class="bi {{ icon }}"></i></a>
           {% endfor %}
         </div>
         {% endif %}

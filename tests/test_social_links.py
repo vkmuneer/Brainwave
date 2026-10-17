@@ -26,8 +26,12 @@ def test_admin_saves_links_and_footer_shows_clickable_icons(client, app, data):
     assert 'href="https://instagram.com/brainwave"' in body
     assert "bi-instagram" in body
     assert "bi-youtube" in body
-    # Facebook was left blank, so its icon is not drawn.
-    assert "bi-facebook" not in body
+    # Each badge carries its brand class so it gets its platform colour.
+    assert "soc-bi-instagram" in body
+    assert "soc-bi-youtube" in body
+    # Facebook was left blank, so no Facebook badge is drawn. (The brand CSS
+    # rule is always in the stylesheet, so check for the rendered anchor.)
+    assert 'class="soc-bi-facebook"' not in body
 
 
 def test_a_bare_domain_becomes_https(client, app, data):
