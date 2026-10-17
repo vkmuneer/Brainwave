@@ -1,0 +1,27 @@
+{# Shared class + division filter pair, so every filter form in the app shows
+   the same control. Picking a class clears any division choice and reloads;
+   the division list then shows that class's divisions. The division select is
+   disabled until a class is chosen. Branch scoping is handled by the caller
+   passing an already-scoped `classes` list. #}
+{% macro class_division(classes, selected_class_id, selected_division_id, col="col-6 col-md-2") %}
+<div class="{{ col }}">
+  <select name="class_id" class="form-select"
+          onchange="if(this.form.division_id){this.form.division_id.value='';}this.form.submit()">
+    <option value="">All Classes</option>
+    {% for c in classes %}
+    <option value="{{ c.id }}" {{ 'selected' if selected_class_id == c.id }}>{{ c.name }}</option>
+    {% endfor %}
+  </select>
+</div>
+<div class="{{ col }}">
+  <select name="division_id" class="form-select" onchange="this.form.submit()"
+          {{ 'disabled' if not selected_class_id }}>
+    <option value="">All Divisions</option>
+    {% for c in classes if c.id == selected_class_id %}
+      {% for d in c.divisions|sort(attribute='name') %}
+      <option value="{{ d.id }}" {{ 'selected' if selected_division_id == d.id }}>{{ d.name }}</option>
+      {% endfor %}
+    {% endfor %}
+  </select>
+</div>
+{% endmacro %}

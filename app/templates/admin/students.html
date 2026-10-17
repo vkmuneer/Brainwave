@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Students - Brainwave Academy{% endblock %}
 {% block content %}
+{% from "_filters.html" import class_division %}
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <h4 class="text-bw-teal m-0">Students</h4>
   <div class="d-flex gap-2">
@@ -10,26 +11,7 @@
 </div>
 
 <form method="get" class="row g-2 mb-3">
-  <div class="col-6 col-md-2">
-    <select name="class_id" class="form-select"
-            onchange="this.form.division_id.value='';this.form.submit()">
-      <option value="">All Classes</option>
-      {% for c in classes %}
-      <option value="{{ c.id }}" {{ 'selected' if selected_class_id == c.id }}>{{ c.name }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="col-6 col-md-2">
-    <select name="division_id" class="form-select" onchange="this.form.submit()"
-            {{ 'disabled' if not selected_class_id }}>
-      <option value="">All Divisions</option>
-      {% for c in classes if c.id == selected_class_id %}
-        {% for d in c.divisions|sort(attribute='name') %}
-        <option value="{{ d.id }}" {{ 'selected' if selected_division_id == d.id }}>{{ d.name }}</option>
-        {% endfor %}
-      {% endfor %}
-    </select>
-  </div>
+  {{ class_division(classes, selected_class_id, selected_division_id) }}
   <div class="col-6 col-md-2">
     <select name="status" class="form-select" onchange="this.form.submit()">
       <option value="">All Statuses</option>

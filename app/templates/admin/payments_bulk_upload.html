@@ -13,25 +13,50 @@
 
     <form method="get" action="{{ url_for('admin.payments_bulk_template') }}"
           class="row g-2 mb-4">
-      <div class="col-12 col-sm-5">
+      <div class="col-12 col-sm-4">
         <label class="form-label small mb-0">Class</label>
-        <select name="class_id" class="form-select">
+        <select name="class_id" id="bulkClass" class="form-select" onchange="bulkFilterDivs()">
           <option value="">All classes</option>
           {% for c in classes %}
-          <option value="{{ c.id }}">Class {{ c.name }}</option>
+          <option value="{{ c.id }}" {{ 'selected' if selected_class_id == c.id }}>Class {{ c.name }}</option>
           {% endfor %}
         </select>
       </div>
-      <div class="col-6 col-sm-3">
-        <label class="form-label small mb-0">Installment columns</label>
+      <div class="col-12 col-sm-3">
+        <label class="form-label small mb-0">Division</label>
+        <select name="division_id" id="bulkDiv" class="form-select" {{ 'disabled' if not selected_class_id }}>
+          <option value="">All divisions</option>
+          {% for c in classes %}
+            {% for d in c.divisions|sort(attribute='name') %}
+            <option value="{{ d.id }}" data-class="{{ c.id }}"
+                    {{ 'selected' if selected_division_id == d.id }}
+                    {% if selected_class_id != c.id %}hidden{% endif %}>{{ d.name }}</option>
+            {% endfor %}
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-sm-2">
+        <label class="form-label small mb-0">Installments</label>
         <input type="number" name="installments" class="form-control" min="1" max="12" value="6">
       </div>
-      <div class="col-6 col-sm-4 d-flex align-items-end">
+      <div class="col-6 col-sm-3 d-flex align-items-end">
         <button class="btn btn-outline-secondary w-100 text-nowrap">
-          <i class="bi bi-download"></i> Download sheet
+          <i class="bi bi-download"></i> Download
         </button>
       </div>
     </form>
+    <script>
+      function bulkFilterDivs() {
+        var cls = document.getElementById('bulkClass').value;
+        var div = document.getElementById('bulkDiv');
+        div.value = '';
+        Array.prototype.forEach.call(div.options, function (o) {
+          if (!o.value) return;
+          o.hidden = !(cls && o.getAttribute('data-class') === cls);
+        });
+        div.disabled = !cls;
+      }
+    </script>
 
     <div class="small text-muted mb-3">
       Each row reads like:

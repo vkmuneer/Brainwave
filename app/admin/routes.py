@@ -850,11 +850,14 @@ def class_wise_report_pdf():
 
 def _compute_student_wise_report(args):
     class_id = args.get("class_id", type=int)
+    division_id = args.get("division_id", type=int)
     q = args.get("q", "").strip()
 
     query = limit_students(Student.query.filter_by(active=True))
     if class_id:
         query = query.filter_by(class_id=class_id)
+    if division_id:
+        query = query.filter_by(division_id=division_id)
     if q:
         like = f"%{q}%"
         query = query.filter(db.or_(Student.name.ilike(like), Student.admission_no.ilike(like)))
@@ -865,19 +868,20 @@ def _compute_student_wise_report(args):
         "collected": sum(s.total_paid for s in student_list),
         "pending": sum(s.pending_fee for s in student_list),
     }
-    return student_list, class_id, q, totals
+    return student_list, class_id, division_id, q, totals
 
 
 @admin_bp.route("/reports/student-wise")
 @login_required
 @office_required
 def student_wise_report():
-    student_list, class_id, q, totals = _compute_student_wise_report(request.args)
+    student_list, class_id, division_id, q, totals = _compute_student_wise_report(request.args)
     return render_template(
         "admin/student_wise_report.html",
         students=student_list,
         classes=_classes_sorted(),
         selected_class_id=class_id,
+        selected_division_id=division_id,
         q=q,
         totals=totals,
     )
@@ -887,7 +891,7 @@ def student_wise_report():
 @login_required
 @office_required
 def student_wise_report_pdf():
-    student_list, class_id, q, totals = _compute_student_wise_report(request.args)
+    student_list, class_id, division_id, q, totals = _compute_student_wise_report(request.args)
     columns = ["Admission No.", "Name", "Class", "Total Fee", "Paid", "Pending", "Status"]
     rows = [
         [
@@ -922,10 +926,13 @@ def student_wise_report_pdf():
 
 def _compute_pending_fees_report(args):
     class_id = args.get("class_id", type=int)
+    division_id = args.get("division_id", type=int)
     q = args.get("q", "").strip()
     query = limit_students(Student.query.filter_by(active=True))
     if class_id:
         query = query.filter_by(class_id=class_id)
+    if division_id:
+        query = query.filter_by(division_id=division_id)
     if q:
         like = f"%{q}%"
         query = query.filter(db.or_(Student.name.ilike(like), Student.admission_no.ilike(like)))
@@ -933,19 +940,20 @@ def _compute_pending_fees_report(args):
     student_list = [s for s in query.all() if s.pending_fee > 0]
     student_list.sort(key=lambda s: s.pending_fee, reverse=True)
     total_pending = sum(s.pending_fee for s in student_list)
-    return student_list, class_id, q, total_pending
+    return student_list, class_id, division_id, q, total_pending
 
 
 @admin_bp.route("/reports/pending-fees")
 @login_required
 @office_required
 def pending_fees_report():
-    student_list, class_id, q, total_pending = _compute_pending_fees_report(request.args)
+    student_list, class_id, division_id, q, total_pending = _compute_pending_fees_report(request.args)
     return render_template(
         "admin/pending_fees.html",
         students=student_list,
         classes=_classes_sorted(),
         selected_class_id=class_id,
+        selected_division_id=division_id,
         q=q,
         total_pending=total_pending,
     )
@@ -955,7 +963,7 @@ def pending_fees_report():
 @login_required
 @office_required
 def pending_fees_report_pdf():
-    student_list, class_id, q, total_pending = _compute_pending_fees_report(request.args)
+    student_list, class_id, division_id, q, total_pending = _compute_pending_fees_report(request.args)
     columns = ["Admission No.", "Name", "Class", "Parent WhatsApp", "Total Fee", "Paid", "Pending"]
     rows = [
         [
@@ -1019,9 +1027,12 @@ def send_fee_reminder(student_id):
 @office_required
 def send_bulk_fee_reminders():
     class_id = request.form.get("class_id", type=int)
+    division_id = request.form.get("division_id", type=int)
     query = limit_students(Student.query.filter_by(active=True))
     if class_id:
         query = query.filter_by(class_id=class_id)
+    if division_id:
+        query = query.filter_by(division_id=division_id)
     pending_students = [s for s in query.all() if s.pending_fee > 0]
 
     for student in pending_students:
@@ -1429,7 +1440,9 @@ def payments_bulk_upload():
             flash("Nothing to record - no installments were filled in.", "info")
         return redirect(url_for("admin.payments_bulk_upload"))
 
-    return render_template("admin/payments_bulk_upload.html", classes=_classes_sorted())
+    return render_template("admin/payments_bulk_upload.html", classes=_classes_sorted(),
+                           selected_class_id=request.args.get("class_id", type=int),
+                           selected_division_id=request.args.get("division_id", type=int))
 
 
 @admin_bp.route("/payments/bulk-upload/template")
@@ -1438,9 +1451,12 @@ def payments_bulk_upload():
 def payments_bulk_template():
     query = limit_students(Student.query.filter_by(active=True))
     class_id = request.args.get("class_id", type=int)
+    division_id = request.args.get("division_id", type=int)
     if class_id:
         ensure_class_visible(class_id)
         query = query.filter_by(class_id=class_id)
+    if division_id:
+        query = query.filter_by(division_id=division_id)
 
     installments = min(max(request.args.get("installments", type=int) or 6, 1), 12)
     students = [s for s in query.order_by(Student.name).all() if s.pending_fee > 0]
