@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Home Video{% endblock %}
+{% block content %}
+<h4 class="text-bw-teal mb-3"><i class="bi bi-play-circle"></i> Home Page Video</h4>
+
+<div class="card bw-card mb-4" style="max-width: 680px;">
+  <div class="card-body">
+    <p class="text-muted small">
+      A short intro video shown in its own section on the public home page, below the
+      faculty pool. The image banners stay as they are. The video only downloads when a
+      visitor presses play, so the page stays fast.
+    </p>
+
+    {% if settings.has_home_video %}
+    <div class="mb-3">
+      <label class="form-label">Current video</label>
+      <video controls preload="none" style="width:100%;border-radius:10px;background:#000;aspect-ratio:16/9;"
+             {% if settings.home_video_poster %}poster="{{ url_for('public.home_video_poster') }}?v={{ range(99999)|random }}"{% endif %}>
+        <source src="{{ url_for('public.home_video_file') }}?v={{ range(99999)|random }}" type="{{ settings.home_video_mimetype }}">
+      </video>
+    </div>
+    <form method="post" class="mb-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="remove_video" value="1">
+      <button class="btn btn-sm btn-outline-danger"
+              onclick="return confirm('Remove the home video?');">Remove current video</button>
+    </form>
+    <hr>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-3">
+        <label class="form-label">{{ 'Replace video' if settings.has_home_video else 'Video file' }}</label>
+        <input type="file" name="video" class="form-control" accept="video/mp4,video/webm">
+        <div class="form-text">
+          MP4 or WebM, up to 50 MB. For a fast, high-quality clip: keep it short
+          (15&ndash;40s), 1080p or 720p, H.264. Muting it is optional since it has a play button.
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Poster image <span class="text-muted">(optional but recommended)</span></label>
+        <input type="file" name="poster" class="form-control" accept="image/png,image/jpeg,image/webp">
+        <div class="form-text">Shown before play and on slow connections. A wide 16:9 frame works best. Up to 2 MB.
+          {% if settings.home_video_poster %}
+          <label class="ms-2"><input type="checkbox" name="remove_poster" value="1"> remove current poster</label>
+          {% endif %}
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Section heading</label>
+        <input type="text" name="title" class="form-control" maxlength="150"
+               placeholder="Inside Brainwave Academy" value="{{ settings.home_video_title or '' }}">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Short text under the heading</label>
+        <input type="text" name="text" class="form-control" maxlength="300"
+               placeholder="A quick tour of our classes, labs and campus."
+               value="{{ settings.home_video_text or '' }}">
+      </div>
+      <button type="submit" class="btn btn-bw-primary"><i class="bi bi-upload"></i> Save</button>
+    </form>
+  </div>
+</div>
+
+<div class="alert alert-info small" style="max-width:680px;">
+  <b>Tip:</b> to shrink a big video without losing quality, you can compress it free at
+  <code>handbrake.fr</code> (preset &ldquo;Web &rarr; Vimeo/YouTube 1080p30&rdquo;) or
+  <code>cloudconvert.com</code>. Aim for under ~15 MB.
+</div>
+{% endblock %}

@@ -45,9 +45,12 @@ class Config:
     SESSION_COOKIE_SECURE = os.environ.get("SECURE_COOKIES", "0") == "1"
     REMEMBER_COOKIE_SECURE = SESSION_COOKIE_SECURE
 
-    # Caps an upload before it is read into memory. The largest legitimate
-    # upload is a logo or a class spreadsheet, both far below this.
-    MAX_CONTENT_LENGTH = 8 * 1024 * 1024
+    # Caps an upload before it is read into memory. Most uploads (a logo, a
+    # photo, a spreadsheet) are tiny; the one large one is a short home-page
+    # intro video, so the ceiling is sized for that.
+    MAX_CONTENT_LENGTH = 64 * 1024 * 1024
+    # A home-page video is held to this; images keep their own 2 MB check.
+    MAX_VIDEO_BYTES = 50 * 1024 * 1024
 
     # Set BEHIND_PROXY=1 on cPanel/nginx so the client's real address is used
     # for login rate limiting rather than the proxy's.

@@ -84,6 +84,7 @@ from ..utils.pdf import render_pdf
 from ..utils.exam_analysis import compute_exam_results, build_report_context, student_progress
 from ..utils.video import is_acceptable_link
 from ..utils.images import read_image_upload
+from ..utils.media import save_home_video, delete_media
 
 
 def _pdf_response(template_name, filename, **context):
@@ -3072,3 +3073,49 @@ def team_delete(member_id):
     db.session.commit()
     flash("Team member removed.", "success")
     return redirect(url_for("admin.team"))
+
+
+# ------------------------------------------------------------------ home video
+@admin_bp.route("/home-video", methods=["GET", "POST"])
+@login_required
+@admin_required
+def home_video():
+    """Upload / replace the short intro video shown on the home page."""
+    settings = Settings.get()
+    if request.method == "POST":
+        if request.form.get("remove_video"):
+            delete_media(settings.home_video_filename)
+            settings.home_video_filename = None
+            settings.home_video_mimetype = None
+            db.session.commit()
+            flash("Home video removed.", "info")
+            return redirect(url_for("admin.home_video"))
+
+        settings.home_video_title = request.form.get("title", "").strip()[:150]
+        settings.home_video_text = request.form.get("text", "").strip()[:300]
+
+        filename, mimetype, error = save_home_video(request.files.get("video"))
+        if error:
+            flash(error, "danger")
+            return redirect(url_for("admin.home_video"))
+        if filename:
+            delete_media(settings.home_video_filename)   # replace the old file
+            settings.home_video_filename = filename
+            settings.home_video_mimetype = mimetype
+
+        poster, poster_type, perr = read_image_upload(request.files.get("poster"))
+        if perr:
+            flash(perr, "danger")
+            return redirect(url_for("admin.home_video"))
+        if poster is not None:
+            settings.home_video_poster = poster
+            settings.home_video_poster_mimetype = poster_type
+        if request.form.get("remove_poster"):
+            settings.home_video_poster = None
+            settings.home_video_poster_mimetype = None
+
+        db.session.commit()
+        flash("Home video updated.", "success")
+        return redirect(url_for("admin.home_video"))
+
+    return render_template("admin/home_video.html", settings=settings)

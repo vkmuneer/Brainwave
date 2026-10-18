@@ -211,6 +211,36 @@ def gallery_image(image_id):
     return response
 
 
+@public_bp.route("/home-video/file")
+def home_video_file():
+    """Streams the uploaded home-page video from the instance folder.
+
+    conditional=True makes send_file honour HTTP Range requests, which Safari
+    requires to play a <video> and which lets any browser seek without
+    downloading the whole clip.
+    """
+    settings = Settings.get()
+    if not settings.home_video_filename:
+        abort(404)
+    from ..utils.media import media_dir
+    path = os.path.join(media_dir(), settings.home_video_filename)
+    if not os.path.exists(path):
+        abort(404)
+    return send_file(path, mimetype=settings.home_video_mimetype or "video/mp4",
+                     conditional=True)
+
+
+@public_bp.route("/home-video/poster")
+def home_video_poster():
+    settings = Settings.get()
+    if not settings.home_video_poster:
+        abort(404)
+    response = send_file(BytesIO(settings.home_video_poster),
+                         mimetype=settings.home_video_poster_mimetype or "image/jpeg")
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return response
+
+
 @public_bp.route("/logo")
 def logo():
     """Serves the uploaded academy logo, falling back to the bundled one.

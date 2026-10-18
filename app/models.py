@@ -416,6 +416,16 @@ class Settings(db.Model):
     facebook_url = db.Column(db.String(255))
     youtube_url = db.Column(db.String(255))
 
+    # Home-page intro video. The file lives on disk under instance/media (too
+    # large for the database); only its name and type are stored here. The
+    # poster is a small image, so it is kept in the database like the logo.
+    home_video_filename = db.Column(db.String(200))
+    home_video_mimetype = db.Column(db.String(40))
+    home_video_poster = db.Column(db.LargeBinary)
+    home_video_poster_mimetype = db.Column(db.String(40))
+    home_video_title = db.Column(db.String(150))
+    home_video_text = db.Column(db.String(300))
+
     # Held in the database rather than as a file on disk so that one backup of
     # brainwave.db captures the branding too, and so a redeploy onto a fresh
     # filesystem does not silently lose the logo.
@@ -461,6 +471,10 @@ class Settings(db.Model):
             ("YouTube", "bi-youtube", self.youtube_url),
         ]
         return [(label, icon, url) for label, icon, url in pairs if url]
+
+    @property
+    def has_home_video(self):
+        return bool(self.home_video_filename)
 
     @classmethod
     def get(cls):
