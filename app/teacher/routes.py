@@ -510,7 +510,7 @@ def video_delete(video_id):
     return redirect(url_for("teacher.videos"))
 
 
-DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 PERIODS = list(range(1, 7))
 
 

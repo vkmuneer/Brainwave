@@ -3597,7 +3597,7 @@ def payroll_payslip(teacher_id):
 
 
 # -------------------------------------------------- timetable
-DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 PERIODS = list(range(1, 7))
 
 

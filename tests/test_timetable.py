@@ -77,3 +77,17 @@ def test_office_scoped_division_only(client, app, data):
     with app.app_context():
         hs_div = SchoolClass.query.filter_by(name="SSLC").first().divisions[0].id
     assert client.get(f"/admin/timetable?division_id={hs_div}").status_code == 403
+
+
+def test_sunday_is_available_and_saves(client, app, data):
+    from app.models import TimetableSlot
+    div_id, subj_id, teacher_id = _ids(app)
+    login(client, "admin", "admin123")
+    page = client.get(f"/admin/timetable?division_id={div_id}").get_data(as_text=True)
+    assert "Sunday" in page
+    # Sunday is day index 6.
+    client.post("/admin/timetable",
+                data={"division_id": div_id, "s_6_1": subj_id, "t_6_1": teacher_id},
+                follow_redirects=True)
+    with app.app_context():
+        assert TimetableSlot.query.filter_by(division_id=div_id, day=6, period=1).first() is not None
