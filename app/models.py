@@ -1049,3 +1049,33 @@ class BannerImage(db.Model):
 
     def __repr__(self):
         return f"<BannerImage {self.id}>"
+
+
+class TeamMember(db.Model):
+    """A member of the management / leadership team shown on the home page,
+    above the faculty pool. Separate from Teacher because directors and
+    management are not necessarily teaching staff.
+
+    Photo is stored in the database like the logo and gallery. 'active' hides a
+    member without deleting them; 'sort_order' sets the display order.
+    """
+
+    __tablename__ = "team_members"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    designation = db.Column(db.String(120))          # e.g. "Managing Director"
+    credentials = db.Column(db.String(200))          # e.g. "M.Sc Physics · 22 years"
+    bio = db.Column(db.Text)                          # experience and expertise
+    photo_data = db.Column(db.LargeBinary)
+    photo_mimetype = db.Column(db.String(40))
+    sort_order = db.Column(db.Integer, default=100, nullable=False)
+    active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    @property
+    def has_photo(self):
+        return self.photo_data is not None
+
+    def __repr__(self):
+        return f"<TeamMember {self.name}>"

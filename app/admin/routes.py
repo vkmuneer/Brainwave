@@ -48,6 +48,7 @@ from ..models import (
     AssignmentSubmission,
     GalleryImage,
     BannerImage,
+    TeamMember,
 )
 from ..utils.decorators import admin_required, office_required
 from ..utils.scope import (
@@ -2979,3 +2980,95 @@ def banner_delete(banner_id):
     db.session.commit()
     flash("Banner removed.", "success")
     return redirect(url_for("admin.banners"))
+
+
+# ------------------------------------------------------------------ team
+def _save_member_photo(member, remove_flag, upload):
+    """Apply a photo change to a team member; returns an error string or None."""
+    if remove_flag:
+        member.photo_data = None
+        member.photo_mimetype = None
+        return None
+    data, mimetype, error = read_image_upload(upload)
+    if error:
+        return error
+    if data is not None:
+        member.photo_data = data
+        member.photo_mimetype = mimetype
+    return None
+
+
+@admin_bp.route("/team", methods=["GET", "POST"])
+@login_required
+@admin_required
+def team():
+    """Manage the management / leadership team shown on the home page."""
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        if not name:
+            flash("Name is required.", "danger")
+            return redirect(url_for("admin.team"))
+        last = db.session.query(func.max(TeamMember.sort_order)).scalar() or 0
+        member = TeamMember(
+            name=name[:120],
+            designation=request.form.get("designation", "").strip()[:120],
+            credentials=request.form.get("credentials", "").strip()[:200],
+            bio=request.form.get("bio", "").strip(),
+            sort_order=last + 10,
+        )
+        error = _save_member_photo(member, False, request.files.get("photo"))
+        if error:
+            flash(error, "danger")
+            return redirect(url_for("admin.team"))
+        db.session.add(member)
+        db.session.commit()
+        flash("Team member added.", "success")
+        return redirect(url_for("admin.team"))
+
+    members = TeamMember.query.order_by(TeamMember.sort_order, TeamMember.created_at).all()
+    return render_template("admin/team.html", members=members)
+
+
+@admin_bp.route("/team/<int:member_id>/update", methods=["POST"])
+@login_required
+@admin_required
+def team_update(member_id):
+    member = TeamMember.query.get_or_404(member_id)
+    name = request.form.get("name", "").strip()
+    if not name:
+        flash("Name cannot be blank.", "danger")
+        return redirect(url_for("admin.team"))
+    member.name = name[:120]
+    member.designation = request.form.get("designation", "").strip()[:120]
+    member.credentials = request.form.get("credentials", "").strip()[:200]
+    member.bio = request.form.get("bio", "").strip()
+    member.sort_order = request.form.get("sort_order", type=int) or member.sort_order
+    error = _save_member_photo(member, request.form.get("remove_photo"), request.files.get("photo"))
+    if error:
+        flash(error, "danger")
+        return redirect(url_for("admin.team"))
+    db.session.commit()
+    flash("Team member updated.", "success")
+    return redirect(url_for("admin.team"))
+
+
+@admin_bp.route("/team/<int:member_id>/toggle", methods=["POST"])
+@login_required
+@admin_required
+def team_toggle(member_id):
+    member = TeamMember.query.get_or_404(member_id)
+    member.active = not member.active
+    db.session.commit()
+    flash("Team updated.", "success")
+    return redirect(url_for("admin.team"))
+
+
+@admin_bp.route("/team/<int:member_id>/delete", methods=["POST"])
+@login_required
+@admin_required
+def team_delete(member_id):
+    member = TeamMember.query.get_or_404(member_id)
+    db.session.delete(member)
+    db.session.commit()
+    flash("Team member removed.", "success")
+    return redirect(url_for("admin.team"))

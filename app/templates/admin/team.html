@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Management Team{% endblock %}
+{% block content %}
+<h4 class="text-bw-teal mb-3"><i class="bi bi-person-vcard"></i> Management Team</h4>
+
+<div class="card bw-card mb-4" style="max-width: 640px;">
+  <div class="card-body">
+    <h6 class="text-bw-teal">Add a team member</h6>
+    <p class="text-muted small">Shown on the public home page, above the faculty pool.</p>
+    <form method="post" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="row">
+        <div class="col-12 col-sm-6 mb-3">
+          <label class="form-label">Name *</label>
+          <input type="text" name="name" class="form-control" maxlength="120" required>
+        </div>
+        <div class="col-12 col-sm-6 mb-3">
+          <label class="form-label">Designation</label>
+          <input type="text" name="designation" class="form-control" maxlength="120"
+                 placeholder="Managing Director">
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Basic info <span class="text-muted">(short line)</span></label>
+        <input type="text" name="credentials" class="form-control" maxlength="200"
+               placeholder="M.Sc Physics, B.Ed · 22 years in education">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Short bio <span class="text-muted">(experience &amp; expertise)</span></label>
+        <textarea name="bio" class="form-control" rows="3"
+                  placeholder="Two or three sentences on their background and what they lead."></textarea>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Photo <span class="text-muted">(optional)</span></label>
+        <input type="file" name="photo" class="form-control" accept="image/png,image/jpeg,image/webp">
+        <div class="form-text">PNG, JPG or WebP up to 2 MB. A square photo looks best.</div>
+      </div>
+      <button type="submit" class="btn btn-bw-primary"><i class="bi bi-plus-lg"></i> Add member</button>
+    </form>
+  </div>
+</div>
+
+<h6 class="text-bw-teal">{{ members|length }} member{{ '' if members|length == 1 else 's' }}</h6>
+<div class="row g-3">
+  {% for m in members %}
+  <div class="col-12 col-lg-6">
+    <div class="card bw-card h-100">
+      <div class="card-body">
+        {% if not m.active %}<span class="badge bg-secondary mb-2">Hidden</span>{% endif %}
+        <form method="post" action="{{ url_for('admin.team_update', member_id=m.id) }}"
+              enctype="multipart/form-data" class="row g-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="col-12 d-flex align-items-center gap-3 mb-1">
+            {% if m.has_photo %}
+            <img src="{{ url_for('public.team_photo', member_id=m.id) }}?v={{ range(99999)|random }}"
+                 alt="" style="width:64px;height:64px;border-radius:12px;object-fit:cover;">
+            {% else %}
+            <div style="width:64px;height:64px;border-radius:12px;display:grid;place-items:center;background:var(--bw-teal);color:#fff;font-weight:700;font-size:1.4rem;">{{ m.name[0]|upper }}</div>
+            {% endif %}
+            <div class="flex-grow-1">
+              <input type="file" name="photo" class="form-control form-control-sm" accept="image/png,image/jpeg,image/webp">
+              {% if m.has_photo %}
+              <div class="form-check small mt-1">
+                <input class="form-check-input" type="checkbox" name="remove_photo" id="rm{{ m.id }}">
+                <label class="form-check-label" for="rm{{ m.id }}">Remove photo</label>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+          <div class="col-7"><label class="form-label small mb-0">Name</label>
+            <input type="text" name="name" class="form-control form-control-sm" value="{{ m.name }}" required></div>
+          <div class="col-5"><label class="form-label small mb-0">Order</label>
+            <input type="number" name="sort_order" class="form-control form-control-sm" value="{{ m.sort_order }}"></div>
+          <div class="col-12"><label class="form-label small mb-0">Designation</label>
+            <input type="text" name="designation" class="form-control form-control-sm" value="{{ m.designation or '' }}"></div>
+          <div class="col-12"><label class="form-label small mb-0">Basic info</label>
+            <input type="text" name="credentials" class="form-control form-control-sm" value="{{ m.credentials or '' }}"></div>
+          <div class="col-12"><label class="form-label small mb-0">Short bio</label>
+            <textarea name="bio" class="form-control form-control-sm" rows="2">{{ m.bio or '' }}</textarea></div>
+          <div class="col-12"><button class="btn btn-sm btn-bw-primary">Save</button></div>
+        </form>
+        <div class="d-flex gap-2 mt-2">
+          <form method="post" action="{{ url_for('admin.team_toggle', member_id=m.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-secondary">{{ 'Hide' if m.active else 'Show' }}</button>
+          </form>
+          <form method="post" action="{{ url_for('admin.team_delete', member_id=m.id) }}"
+                onsubmit="return confirm('Remove {{ m.name }}?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-danger">Delete</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12"><p class="text-muted">No team members yet. Add the first one above.</p></div>
+  {% endfor %}
+</div>
+{% endblock %}

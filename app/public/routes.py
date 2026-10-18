@@ -20,9 +20,14 @@ def home():
     """
     from ..models import SchoolClass, Subject, Teacher, Course, CLASS_ORDER
 
-    from ..models import BannerImage
+    from ..models import BannerImage, TeamMember
 
     settings = Settings.get()
+    team = (
+        TeamMember.query.filter_by(active=True)
+        .order_by(TeamMember.sort_order, TeamMember.created_at)
+        .all()
+    )
     banners = (
         BannerImage.query.filter_by(active=True)
         .order_by(BannerImage.sort_order, BannerImage.created_at)
@@ -102,6 +107,7 @@ def home():
         portal_open=settings.student_login_enabled,
         faculty=faculty,
         banners=banners,
+        team=team,
     )
 
 
@@ -136,6 +142,18 @@ def lecture_thumb(video_id):
     from ..models import CourseVideo
 
     return _serve_thumbnail(CourseVideo.query.get(video_id))
+
+
+@public_bp.route("/photo/team/<int:member_id>")
+def team_photo(member_id):
+    from ..models import TeamMember
+
+    member = TeamMember.query.get(member_id)
+    if member is None or not member.photo_data:
+        abort(404)
+    response = send_file(BytesIO(member.photo_data), mimetype=member.photo_mimetype or "image/png")
+    response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 @public_bp.route("/photo/staff/<int:user_id>")
