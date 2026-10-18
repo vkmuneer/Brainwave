@@ -1093,3 +1093,27 @@ class TeamMember(db.Model):
 
     def __repr__(self):
         return f"<TeamMember {self.name}>"
+
+
+class TeacherPayment(db.Model):
+    """A cash payment made to a teacher, recorded by admin or office for the
+    accounts. Logged freely - any amount with a note - so it covers salary,
+    per-class pay or a one-off. Each is an expense in the accounts module.
+    """
+
+    __tablename__ = "teacher_payments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    teacher_id = db.Column(db.Integer, db.ForeignKey("teachers.id"), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    pay_date = db.Column(db.Date, default=date.today, nullable=False, index=True)
+    purpose = db.Column(db.String(200))          # "October salary", "extra classes"...
+    period = db.Column(db.String(40))            # optional month/label
+    mode = db.Column(db.String(20), default="Cash", nullable=False)
+    paid_by = db.Column(db.String(120))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    teacher = db.relationship("Teacher")
+
+    def __repr__(self):
+        return f"<TeacherPayment {self.teacher_id} Rs.{self.amount}>"

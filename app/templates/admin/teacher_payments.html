@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Teacher Payments{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <h4 class="text-bw-teal m-0"><i class="bi bi-cash-stack"></i> Teacher Payments</h4>
+  <a href="{{ url_for('admin.teacher_payments_excel', teacher_id=selected_teacher_id) }}"
+     class="btn btn-sm btn-outline-secondary"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+</div>
+
+<div class="card bw-card mb-4" style="max-width: 720px;">
+  <div class="card-body">
+    <h6 class="text-bw-teal">Record a payment</h6>
+    <form method="post" class="row g-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-12 col-md-5">
+        <label class="form-label small mb-0">Teacher *</label>
+        <select name="teacher_id" class="form-select" required>
+          <option value="">Choose...</option>
+          {% for t in teachers %}
+          <option value="{{ t.id }}" {{ 'selected' if selected_teacher_id == t.id }}>{{ t.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-0">Amount (Rs.) *</label>
+        <input type="number" name="amount" class="form-control" step="1" min="1" required>
+      </div>
+      <div class="col-6 col-md-4">
+        <label class="form-label small mb-0">Date</label>
+        <input type="date" name="pay_date" class="form-control" value="{{ today.isoformat() }}">
+      </div>
+      <div class="col-12 col-md-5">
+        <label class="form-label small mb-0">Purpose</label>
+        <input type="text" name="purpose" class="form-control" maxlength="200" placeholder="October salary / extra classes">
+      </div>
+      <div class="col-6 col-md-4">
+        <label class="form-label small mb-0">Period (optional)</label>
+        <input type="text" name="period" class="form-control" maxlength="40" placeholder="Oct 2026">
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-0">Mode</label>
+        <select name="mode" class="form-select">
+          <option>Cash</option><option>Bank</option><option>UPI</option><option>Cheque</option>
+        </select>
+      </div>
+      <div class="col-12"><button class="btn btn-bw-primary"><i class="bi bi-check-lg"></i> Record payment</button></div>
+    </form>
+  </div>
+</div>
+
+<form method="get" class="row g-2 mb-3" style="max-width: 420px;">
+  <div class="col-8">
+    <select name="teacher_id" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">All teachers</option>
+      {% for t in teachers %}
+      <option value="{{ t.id }}" {{ 'selected' if selected_teacher_id == t.id }}>{{ t.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-4"><button class="btn btn-sm btn-outline-secondary w-100">Filter</button></div>
+</form>
+
+<p class="fw-bold">Total shown: Rs. {{ "{:,.0f}".format(total) }}</p>
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead><tr><th>Date</th><th>Teacher</th><th class="text-end">Amount</th><th>Purpose</th>
+      <th>Period</th><th>Mode</th><th>Paid By</th><th></th></tr></thead>
+    <tbody>
+      {% for p in payments %}
+      <tr>
+        <td>{{ p.pay_date.strftime('%d-%m-%Y') }}</td>
+        <td>{{ p.teacher.name }}</td>
+        <td class="text-end fw-bold">{{ "{:,.0f}".format(p.amount) }}</td>
+        <td>{{ p.purpose or '' }}</td>
+        <td>{{ p.period or '' }}</td>
+        <td>{{ p.mode }}</td>
+        <td class="small text-muted">{{ p.paid_by or '' }}</td>
+        <td>
+          {% if current_user.is_admin %}
+          <form method="post" action="{{ url_for('admin.teacher_payment_delete', payment_id=p.id) }}"
+                onsubmit="return confirm('Delete this payment record?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-danger py-0"><i class="bi bi-x"></i></button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="text-muted text-center">No payments recorded yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

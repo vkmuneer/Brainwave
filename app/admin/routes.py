@@ -49,6 +49,7 @@ from ..models import (
     GalleryImage,
     BannerImage,
     TeamMember,
+    TeacherPayment,
 )
 from ..utils.decorators import admin_required, office_required
 from ..utils.scope import (
@@ -3244,3 +3245,73 @@ def attendance_summary_pdf():
         title=f"Attendance Report ({'Division-wise' if view=='division' else 'Student-wise'})",
         meta=data["label"], columns=columns, rows=rows,
     )
+
+
+# -------------------------------------------------- teacher payments
+@admin_bp.route("/teacher-payments", methods=["GET", "POST"])
+@login_required
+@office_required
+def teacher_payments():
+    """Record cash paid to teachers (admin and office). Each is an expense."""
+    if request.method == "POST":
+        teacher_id = request.form.get("teacher_id", type=int)
+        amount = request.form.get("amount", type=float)
+        teacher = Teacher.query.get(teacher_id) if teacher_id else None
+        if teacher is None:
+            flash("Choose a teacher.", "danger")
+        elif not amount or amount <= 0:
+            flash("Enter an amount greater than zero.", "danger")
+        else:
+            pay_date_raw = request.form.get("pay_date")
+            pay_date = datetime.strptime(pay_date_raw, "%Y-%m-%d").date() if pay_date_raw else date.today()
+            db.session.add(TeacherPayment(
+                teacher_id=teacher.id, amount=amount, pay_date=pay_date,
+                purpose=request.form.get("purpose", "").strip()[:200],
+                period=request.form.get("period", "").strip()[:40],
+                mode=request.form.get("mode", "Cash").strip()[:20] or "Cash",
+                paid_by=current_user.name,
+            ))
+            db.session.commit()
+            flash(f"Recorded Rs. {amount:,.0f} paid to {teacher.name}.", "success")
+        return redirect(url_for("admin.teacher_payments", teacher_id=teacher_id))
+
+    teacher_id = request.args.get("teacher_id", type=int)
+    query = TeacherPayment.query
+    if teacher_id:
+        query = query.filter_by(teacher_id=teacher_id)
+    payments = query.order_by(TeacherPayment.pay_date.desc(), TeacherPayment.created_at.desc()).limit(300).all()
+    total = sum(p.amount for p in payments)
+    return render_template(
+        "admin/teacher_payments.html",
+        teachers=Teacher.query.filter_by(active=True).order_by(Teacher.name).all(),
+        payments=payments, total=total, selected_teacher_id=teacher_id,
+    )
+
+
+@admin_bp.route("/teacher-payments/<int:payment_id>/delete", methods=["POST"])
+@login_required
+@admin_required
+def teacher_payment_delete(payment_id):
+    payment = TeacherPayment.query.get_or_404(payment_id)
+    db.session.delete(payment)
+    db.session.commit()
+    flash("Payment record deleted.", "info")
+    return redirect(url_for("admin.teacher_payments"))
+
+
+@admin_bp.route("/teacher-payments/excel")
+@login_required
+@office_required
+def teacher_payments_excel():
+    teacher_id = request.args.get("teacher_id", type=int)
+    query = TeacherPayment.query
+    if teacher_id:
+        query = query.filter_by(teacher_id=teacher_id)
+    payments = query.order_by(TeacherPayment.pay_date.desc()).all()
+    headers = ["Date", "Teacher", "Amount", "Purpose", "Period", "Mode", "Paid By"]
+    rows = [[p.pay_date.strftime("%d-%m-%Y"), p.teacher.name, f"{p.amount:.0f}",
+             p.purpose or "", p.period or "", p.mode, p.paid_by or ""] for p in payments]
+    totals = ["", "Total", f"{sum(p.amount for p in payments):.0f}", "", "", "", ""]
+    buffer = build_simple_sheet("Teacher Payments", headers, rows, totals)
+    return send_file(buffer, as_attachment=True, download_name="teacher_payments.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
