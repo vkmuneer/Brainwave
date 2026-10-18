@@ -3495,3 +3495,101 @@ def accounts_excel():
     return send_file(buffer, as_attachment=True,
                      download_name=f"accounts_{d['start']}_{d['end']}.xlsx",
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+# -------------------------------------------------- payroll
+def _month_bounds(year, month):
+    start = date(year, month, 1)
+    end = date(year, month, calendar.monthrange(year, month)[1])
+    return start, end
+
+
+def _compute_payroll(args):
+    today = date.today()
+    year = args.get("year", type=int) or today.year
+    month = args.get("month", type=int) or today.month
+    start, end = _month_bounds(year, month)
+    teachers = Teacher.query.filter_by(active=True).order_by(Teacher.name).all()
+    rows = []
+    for t in teachers:
+        paid = (db.session.query(func.coalesce(func.sum(TeacherPayment.amount), 0))
+                .filter(TeacherPayment.teacher_id == t.id,
+                        TeacherPayment.pay_date >= start, TeacherPayment.pay_date <= end)
+                .scalar() or 0)
+        rows.append({"teacher": t, "salary": t.monthly_salary or 0, "paid": paid,
+                     "balance": round((t.monthly_salary or 0) - paid, 2)})
+    return {
+        "rows": rows, "year": year, "month": month, "start": start, "end": end,
+        "label": start.strftime("%B %Y"),
+        "total_salary": sum(r["salary"] for r in rows),
+        "total_paid": sum(r["paid"] for r in rows),
+        "total_balance": sum(r["balance"] for r in rows),
+    }
+
+
+@admin_bp.route("/payroll")
+@login_required
+@admin_required
+def payroll():
+    data = _compute_payroll(request.args)
+    years = list(range(date.today().year, date.today().year - 4, -1))
+    return render_template("admin/payroll.html", years=years, months=list(enumerate(
+        ["January","February","March","April","May","June","July","August",
+         "September","October","November","December"], start=1)), **data)
+
+
+@admin_bp.route("/payroll/salary/<int:teacher_id>", methods=["POST"])
+@login_required
+@admin_required
+def payroll_set_salary(teacher_id):
+    teacher = Teacher.query.get_or_404(teacher_id)
+    teacher.monthly_salary = request.form.get("monthly_salary", type=float) or 0
+    db.session.commit()
+    flash(f"Salary updated for {teacher.name}.", "success")
+    return redirect(url_for("admin.payroll", year=request.form.get("year"),
+                            month=request.form.get("month")))
+
+
+@admin_bp.route("/payroll/excel")
+@login_required
+@admin_required
+def payroll_excel():
+    d = _compute_payroll(request.args)
+    headers = ["Teacher", "Monthly Salary", "Paid", "Balance"]
+    rows = [[r["teacher"].name, f"{r['salary']:.0f}", f"{r['paid']:.0f}", f"{r['balance']:.0f}"]
+            for r in d["rows"]]
+    totals = ["Total", f"{d['total_salary']:.0f}", f"{d['total_paid']:.0f}", f"{d['total_balance']:.0f}"]
+    buffer = build_simple_sheet(f"Payroll {d['label']}", headers, rows, totals)
+    return send_file(buffer, as_attachment=True,
+                     download_name=f"payroll_{d['year']}_{d['month']:02d}.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+@admin_bp.route("/payroll/payslip/<int:teacher_id>")
+@login_required
+@admin_required
+def payroll_payslip(teacher_id):
+    teacher = Teacher.query.get_or_404(teacher_id)
+    today = date.today()
+    year = request.args.get("year", type=int) or today.year
+    month = request.args.get("month", type=int) or today.month
+    start, end = _month_bounds(year, month)
+    payments = (TeacherPayment.query
+                .filter(TeacherPayment.teacher_id == teacher.id,
+                        TeacherPayment.pay_date >= start, TeacherPayment.pay_date <= end)
+                .order_by(TeacherPayment.pay_date).all())
+    paid = sum(p.amount for p in payments)
+    columns = ["Date", "Purpose", "Mode", "Amount"]
+    rows = [[p.pay_date.strftime("%d-%m-%Y"), p.purpose or "-", p.mode, f"Rs. {p.amount:,.0f}"]
+            for p in payments]
+    return _pdf_response(
+        "pdf/generic_report_pdf.html",
+        f"payslip_{teacher.name.replace(' ', '_')}_{year}_{month:02d}.pdf",
+        title=f"Payslip - {teacher.name}",
+        meta=start.strftime("%B %Y"),
+        columns=columns, rows=rows,
+        totals_row=["", "", "Total paid", f"Rs. {paid:,.0f}"],
+        summary_lines=[("Monthly salary", f"Rs. {teacher.monthly_salary or 0:,.0f}"),
+                       ("Paid this month", f"Rs. {paid:,.0f}"),
+                       ("Balance", f"Rs. {(teacher.monthly_salary or 0) - paid:,.0f}")],
+    )

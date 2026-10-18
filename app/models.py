@@ -255,6 +255,10 @@ class Teacher(db.Model):
     designation = db.Column(db.String(120))   # e.g. "Principal", "Physics Faculty"
     display_order = db.Column(db.Integer, default=100, nullable=False)
 
+    # Monthly salary for payroll. Payments are recorded in TeacherPayment; this
+    # is what each month is measured against.
+    monthly_salary = db.Column(db.Float, default=0, nullable=False)
+
     divisions = db.relationship("Division", secondary=teacher_divisions, backref="teachers")
     subjects = db.relationship("Subject", secondary=teacher_subjects, backref="teachers")
 

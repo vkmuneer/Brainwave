@@ -75,6 +75,7 @@
           <ul class="dropdown-menu">
             {% if current_user.is_admin %}
             <li><a class="dropdown-item" href="{{ url_for('admin.accounts_dashboard') }}">Accounts Dashboard</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('admin.payroll') }}">Payroll</a></li>
             <li><hr class="dropdown-divider"></li>
             {% endif %}
             <li><a class="dropdown-item" href="{{ url_for('admin.teacher_payments') }}">Teacher Payments</a></li>

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Payroll{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <h4 class="text-bw-teal m-0"><i class="bi bi-cash-stack"></i> Payroll &middot; {{ label }}</h4>
+  <a href="{{ url_for('admin.payroll_excel', year=year, month=month) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+</div>
+
+<form method="get" class="row g-2 mb-3" style="max-width:420px;">
+  <div class="col-6">
+    <select name="month" class="form-select form-select-sm" onchange="this.form.submit()">
+      {% for num, nm in months %}<option value="{{ num }}" {{ 'selected' if num == month }}>{{ nm }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-6">
+    <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">
+      {% for y in years %}<option value="{{ y }}" {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}
+    </select>
+  </div>
+</form>
+
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead><tr><th>Teacher</th><th style="width:170px;">Monthly Salary</th><th class="text-end">Paid ({{ label }})</th>
+      <th class="text-end">Balance</th><th></th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>{{ r.teacher.name }}</td>
+        <td>
+          <form method="post" action="{{ url_for('admin.payroll_set_salary', teacher_id=r.teacher.id) }}" class="d-flex gap-1">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="year" value="{{ year }}"><input type="hidden" name="month" value="{{ month }}">
+            <input type="number" name="monthly_salary" class="form-control form-control-sm" value="{{ r.salary|int }}" step="1" min="0">
+            <button class="btn btn-sm btn-outline-secondary" title="Save salary"><i class="bi bi-check"></i></button>
+          </form>
+        </td>
+        <td class="text-end text-success">{{ "{:,.0f}".format(r.paid) }}</td>
+        <td class="text-end fw-bold {{ 'text-danger' if r.balance > 0 }}">{{ "{:,.0f}".format(r.balance) }}</td>
+        <td class="text-nowrap">
+          <a href="{{ url_for('admin.teacher_payments', teacher_id=r.teacher.id) }}" class="btn btn-sm btn-bw-primary py-0">Pay</a>
+          <a href="{{ url_for('admin.payroll_payslip', teacher_id=r.teacher.id, year=year, month=month) }}" class="btn btn-sm btn-outline-secondary py-0">Payslip</a>
+        </td>
+      </tr>
+      {% else %}<tr><td colspan="5" class="text-muted text-center">No active teachers.</td></tr>{% endfor %}
+    </tbody>
+    <tfoot><tr class="table-light fw-bold">
+      <td>Total</td><td class="text-end">{{ "{:,.0f}".format(total_salary) }}</td>
+      <td class="text-end">{{ "{:,.0f}".format(total_paid) }}</td>
+      <td class="text-end">{{ "{:,.0f}".format(total_balance) }}</td><td></td>
+    </tr></tfoot>
+  </table>
+</div>
+<p class="text-muted small">"Paid" is the total of Teacher Payments dated within the selected month. Set a salary, use <b>Pay</b> to record a payment, and <b>Payslip</b> for a printable PDF.</p>
+{% endblock %}
