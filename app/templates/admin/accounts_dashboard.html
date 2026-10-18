@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Accounts Dashboard{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <h4 class="text-bw-teal m-0"><i class="bi bi-bank"></i> Accounts</h4>
+  <a href="{{ url_for('admin.accounts_excel', start=start.isoformat(), end=end.isoformat()) }}"
+     class="btn btn-sm btn-outline-secondary"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+</div>
+
+<form method="get" class="row g-2 mb-3" style="max-width:520px;">
+  <div class="col-5"><label class="form-label small mb-0">From</label>
+    <input type="date" name="start" class="form-control" value="{{ start.isoformat() }}"></div>
+  <div class="col-5"><label class="form-label small mb-0">To</label>
+    <input type="date" name="end" class="form-control" value="{{ end.isoformat() }}"></div>
+  <div class="col-2 align-self-end"><button class="btn btn-bw-primary w-100">Apply</button></div>
+</form>
+<p class="text-muted small">Period: {{ label }}</p>
+
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-4">
+    <div class="card bw-stat-card h-100"><div class="card-body">
+      <div class="small">Total Income</div>
+      <div class="stat-value text-success">₹{{ "{:,.0f}".format(total_income) }}</div>
+    </div></div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="card bw-stat-card h-100"><div class="card-body">
+      <div class="small">Total Expenditure</div>
+      <div class="stat-value text-danger">₹{{ "{:,.0f}".format(total_expense) }}</div>
+    </div></div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="card bw-stat-card h-100"><div class="card-body">
+      <div class="small">{{ 'Surplus' if net >= 0 else 'Deficit' }}</div>
+      <div class="stat-value {{ 'text-success' if net >= 0 else 'text-danger' }}">₹{{ "{:,.0f}".format(net) }}</div>
+    </div></div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-12 col-lg-6">
+    <h6 class="text-success"><i class="bi bi-arrow-down-circle"></i> Income</h6>
+    <table class="table table-sm table-striped">
+      <tbody>
+        {% for k, v in income_by.items() %}
+        <tr><td>{{ k }}</td><td class="text-end fw-bold">{{ "{:,.0f}".format(v) }}</td></tr>
+        {% else %}<tr><td colspan="2" class="text-muted">No income in this period.</td></tr>{% endfor %}
+      </tbody>
+      <tfoot><tr class="table-light"><th>Total</th><th class="text-end">{{ "{:,.0f}".format(total_income) }}</th></tr></tfoot>
+    </table>
+  </div>
+  <div class="col-12 col-lg-6">
+    <h6 class="text-danger"><i class="bi bi-arrow-up-circle"></i> Expenditure</h6>
+    <table class="table table-sm table-striped">
+      <tbody>
+        {% for k, v in expense_by.items() %}
+        <tr><td>{{ k }}</td><td class="text-end fw-bold">{{ "{:,.0f}".format(v) }}</td></tr>
+        {% else %}<tr><td colspan="2" class="text-muted">No expenditure in this period.</td></tr>{% endfor %}
+      </tbody>
+      <tfoot><tr class="table-light"><th>Total</th><th class="text-end">{{ "{:,.0f}".format(total_expense) }}</th></tr></tfoot>
+    </table>
+  </div>
+</div>
+<p class="text-muted small mt-3">Income includes student fees (from the Fees module) plus Other Income. Expenditure includes Teacher Payments plus Expenses.</p>
+{% endblock %}

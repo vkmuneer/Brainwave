@@ -1117,3 +1117,48 @@ class TeacherPayment(db.Model):
 
     def __repr__(self):
         return f"<TeacherPayment {self.teacher_id} Rs.{self.amount}>"
+
+
+class ExpenseEntry(db.Model):
+    """Money spent by the academy - rent, electricity, supplies, maintenance.
+
+    Teacher payments are tracked separately (TeacherPayment) but count as
+    expenses too; the accounts dashboard adds them together.
+    """
+
+    __tablename__ = "expense_entries"
+
+    id = db.Column(db.Integer, primary_key=True)
+    category = db.Column(db.String(60), nullable=False)       # Rent, Electricity, Supplies...
+    amount = db.Column(db.Float, nullable=False)
+    expense_date = db.Column(db.Date, default=date.today, nullable=False, index=True)
+    description = db.Column(db.String(200))
+    payee = db.Column(db.String(120))                         # vendor / who was paid
+    mode = db.Column(db.String(20), default="Cash", nullable=False)
+    recorded_by = db.Column(db.String(120))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    def __repr__(self):
+        return f"<ExpenseEntry {self.category} Rs.{self.amount}>"
+
+
+class IncomeEntry(db.Model):
+    """Income other than student fees - donations, book sales, rent received.
+
+    Student fees come from FeePayment; the accounts dashboard adds these on top.
+    """
+
+    __tablename__ = "income_entries"
+
+    id = db.Column(db.Integer, primary_key=True)
+    source = db.Column(db.String(60), nullable=False)        # Donation, Book sales...
+    amount = db.Column(db.Float, nullable=False)
+    income_date = db.Column(db.Date, default=date.today, nullable=False, index=True)
+    description = db.Column(db.String(200))
+    received_from = db.Column(db.String(120))
+    mode = db.Column(db.String(20), default="Cash", nullable=False)
+    recorded_by = db.Column(db.String(120))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    def __repr__(self):
+        return f"<IncomeEntry {self.source} Rs.{self.amount}>"

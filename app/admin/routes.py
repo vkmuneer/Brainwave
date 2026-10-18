@@ -50,6 +50,8 @@ from ..models import (
     BannerImage,
     TeamMember,
     TeacherPayment,
+    ExpenseEntry,
+    IncomeEntry,
 )
 from ..utils.decorators import admin_required, office_required
 from ..utils.scope import (
@@ -3314,4 +3316,182 @@ def teacher_payments_excel():
     totals = ["", "Total", f"{sum(p.amount for p in payments):.0f}", "", "", "", ""]
     buffer = build_simple_sheet("Teacher Payments", headers, rows, totals)
     return send_file(buffer, as_attachment=True, download_name="teacher_payments.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+# -------------------------------------------------- expenses & other income
+EXPENSE_CATEGORIES = ["Rent", "Electricity", "Water", "Internet & Phone", "Salaries",
+                      "Supplies & Stationery", "Maintenance", "Marketing", "Travel",
+                      "Events", "Refreshments", "Miscellaneous"]
+INCOME_SOURCES = ["Donation", "Book / Material sales", "Rent received", "Event income",
+                  "Registration fee", "Miscellaneous"]
+
+
+def _parse_date(raw):
+    return datetime.strptime(raw, "%Y-%m-%d").date() if raw else date.today()
+
+
+@admin_bp.route("/expenses", methods=["GET", "POST"])
+@login_required
+@office_required
+def expenses():
+    if request.method == "POST":
+        amount = request.form.get("amount", type=float)
+        category = request.form.get("category", "").strip()[:60]
+        if not category:
+            flash("Choose or type a category.", "danger")
+        elif not amount or amount <= 0:
+            flash("Enter an amount greater than zero.", "danger")
+        else:
+            db.session.add(ExpenseEntry(
+                category=category, amount=amount,
+                expense_date=_parse_date(request.form.get("expense_date")),
+                description=request.form.get("description", "").strip()[:200],
+                payee=request.form.get("payee", "").strip()[:120],
+                mode=request.form.get("mode", "Cash").strip()[:20] or "Cash",
+                recorded_by=current_user.name,
+            ))
+            db.session.commit()
+            flash(f"Expense of Rs. {amount:,.0f} recorded.", "success")
+        return redirect(url_for("admin.expenses"))
+
+    entries = ExpenseEntry.query.order_by(ExpenseEntry.expense_date.desc(),
+                                          ExpenseEntry.created_at.desc()).limit(300).all()
+    return render_template("admin/expenses.html", entries=entries,
+                           categories=EXPENSE_CATEGORIES, total=sum(e.amount for e in entries))
+
+
+@admin_bp.route("/expenses/<int:entry_id>/delete", methods=["POST"])
+@login_required
+@admin_required
+def expense_delete(entry_id):
+    entry = ExpenseEntry.query.get_or_404(entry_id)
+    db.session.delete(entry); db.session.commit()
+    flash("Expense deleted.", "info")
+    return redirect(url_for("admin.expenses"))
+
+
+@admin_bp.route("/expenses/excel")
+@login_required
+@office_required
+def expenses_excel():
+    entries = ExpenseEntry.query.order_by(ExpenseEntry.expense_date.desc()).all()
+    headers = ["Date", "Category", "Amount", "Description", "Payee", "Mode", "Recorded By"]
+    rows = [[e.expense_date.strftime("%d-%m-%Y"), e.category, f"{e.amount:.0f}",
+             e.description or "", e.payee or "", e.mode, e.recorded_by or ""] for e in entries]
+    totals = ["", "Total", f"{sum(e.amount for e in entries):.0f}", "", "", "", ""]
+    buffer = build_simple_sheet("Expenses", headers, rows, totals)
+    return send_file(buffer, as_attachment=True, download_name="expenses.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+@admin_bp.route("/other-income", methods=["GET", "POST"])
+@login_required
+@office_required
+def other_income():
+    if request.method == "POST":
+        amount = request.form.get("amount", type=float)
+        source = request.form.get("source", "").strip()[:60]
+        if not source:
+            flash("Choose or type a source.", "danger")
+        elif not amount or amount <= 0:
+            flash("Enter an amount greater than zero.", "danger")
+        else:
+            db.session.add(IncomeEntry(
+                source=source, amount=amount,
+                income_date=_parse_date(request.form.get("income_date")),
+                description=request.form.get("description", "").strip()[:200],
+                received_from=request.form.get("received_from", "").strip()[:120],
+                mode=request.form.get("mode", "Cash").strip()[:20] or "Cash",
+                recorded_by=current_user.name,
+            ))
+            db.session.commit()
+            flash(f"Income of Rs. {amount:,.0f} recorded.", "success")
+        return redirect(url_for("admin.other_income"))
+
+    entries = IncomeEntry.query.order_by(IncomeEntry.income_date.desc(),
+                                         IncomeEntry.created_at.desc()).limit(300).all()
+    return render_template("admin/other_income.html", entries=entries,
+                           sources=INCOME_SOURCES, total=sum(e.amount for e in entries))
+
+
+@admin_bp.route("/other-income/<int:entry_id>/delete", methods=["POST"])
+@login_required
+@admin_required
+def income_delete(entry_id):
+    entry = IncomeEntry.query.get_or_404(entry_id)
+    db.session.delete(entry); db.session.commit()
+    flash("Income entry deleted.", "info")
+    return redirect(url_for("admin.other_income"))
+
+
+@admin_bp.route("/other-income/excel")
+@login_required
+@office_required
+def other_income_excel():
+    entries = IncomeEntry.query.order_by(IncomeEntry.income_date.desc()).all()
+    headers = ["Date", "Source", "Amount", "Description", "Received From", "Mode", "Recorded By"]
+    rows = [[e.income_date.strftime("%d-%m-%Y"), e.source, f"{e.amount:.0f}",
+             e.description or "", e.received_from or "", e.mode, e.recorded_by or ""] for e in entries]
+    totals = ["", "Total", f"{sum(e.amount for e in entries):.0f}", "", "", "", ""]
+    buffer = build_simple_sheet("Other Income", headers, rows, totals)
+    return send_file(buffer, as_attachment=True, download_name="other_income.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+def _compute_accounts(args):
+    """Income vs expenditure over a period, pulling from every source."""
+    today = date.today()
+    start = _parse_date(args.get("start")) if args.get("start") else today.replace(day=1)
+    end = _parse_date(args.get("end")) if args.get("end") else today
+
+    fees = db.session.query(func.coalesce(func.sum(FeePayment.amount), 0)).filter(
+        FeePayment.payment_date >= start, FeePayment.payment_date <= end).scalar() or 0
+    other_income_rows = IncomeEntry.query.filter(
+        IncomeEntry.income_date >= start, IncomeEntry.income_date <= end).all()
+    teacher_pay = db.session.query(func.coalesce(func.sum(TeacherPayment.amount), 0)).filter(
+        TeacherPayment.pay_date >= start, TeacherPayment.pay_date <= end).scalar() or 0
+    expense_rows = ExpenseEntry.query.filter(
+        ExpenseEntry.expense_date >= start, ExpenseEntry.expense_date <= end).all()
+
+    income_by = {"Student fees": fees}
+    for r in other_income_rows:
+        income_by[r.source] = income_by.get(r.source, 0) + r.amount
+    expense_by = {"Teacher payments": teacher_pay}
+    for r in expense_rows:
+        expense_by[r.category] = expense_by.get(r.category, 0) + r.amount
+
+    total_income = sum(income_by.values())
+    total_expense = sum(expense_by.values())
+    return {
+        "start": start, "end": end,
+        "label": f"{start.strftime('%d-%m-%Y')} to {end.strftime('%d-%m-%Y')}",
+        "income_by": {k: v for k, v in income_by.items() if v},
+        "expense_by": {k: v for k, v in expense_by.items() if v},
+        "total_income": total_income, "total_expense": total_expense,
+        "net": round(total_income - total_expense, 2),
+    }
+
+
+@admin_bp.route("/accounts")
+@login_required
+@admin_required
+def accounts_dashboard():
+    return render_template("admin/accounts_dashboard.html", **_compute_accounts(request.args))
+
+
+@admin_bp.route("/accounts/excel")
+@login_required
+@admin_required
+def accounts_excel():
+    d = _compute_accounts(request.args)
+    headers = ["Type", "Category", "Amount"]
+    rows = [["Income", k, f"{v:.0f}"] for k, v in d["income_by"].items()]
+    rows += [["Expense", k, f"{v:.0f}"] for k, v in d["expense_by"].items()]
+    rows.append(["", "Total income", f"{d['total_income']:.0f}"])
+    rows.append(["", "Total expense", f"{d['total_expense']:.0f}"])
+    rows.append(["", "Net", f"{d['net']:.0f}"])
+    buffer = build_simple_sheet("Accounts", headers, rows)
+    return send_file(buffer, as_attachment=True,
+                     download_name=f"accounts_{d['start']}_{d['end']}.xlsx",
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
