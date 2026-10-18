@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Attendance Report{% endblock %}
+{% block content %}
+{% from "_filters.html" import class_division %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <h4 class="text-bw-teal m-0">Attendance Report</h4>
+  <div class="no-print d-flex gap-2">
+    <a href="{{ url_for('admin.attendance_summary_excel', **request.args) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+    <a href="{{ url_for('admin.attendance_summary_pdf', **request.args) }}" class="btn btn-sm btn-bw-primary"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
+  </div>
+</div>
+
+<ul class="nav nav-pills mb-3 no-print">
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if view != 'division' }}"
+       href="{{ url_for('admin.attendance_summary', view='student', start=start.isoformat(), end=end.isoformat(), class_id=selected_class_id, division_id=selected_division_id) }}">Student-wise</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if view == 'division' }}"
+       href="{{ url_for('admin.attendance_summary', view='division', start=start.isoformat(), end=end.isoformat(), class_id=selected_class_id, division_id=selected_division_id) }}">Division-wise</a>
+  </li>
+</ul>
+
+<form method="get" class="row g-2 mb-3">
+  <input type="hidden" name="view" value="{{ view }}">
+  {{ class_division(classes, selected_class_id, selected_division_id) }}
+  <div class="col-6 col-md-2">
+    <input type="date" name="start" class="form-control" value="{{ start.isoformat() }}">
+  </div>
+  <div class="col-6 col-md-2">
+    <input type="date" name="end" class="form-control" value="{{ end.isoformat() }}">
+  </div>
+  <div class="col-12 col-md-2">
+    <button class="btn btn-bw-primary w-100" type="submit">Apply</button>
+  </div>
+</form>
+
+<p class="text-muted small">Period: {{ label }}</p>
+
+<div class="table-responsive">
+  {% if view == 'division' %}
+  <table class="table table-sm table-striped align-middle">
+    <thead><tr><th>Class-Division</th><th class="text-end">Students</th><th class="text-end">Present</th>
+      <th class="text-end">Absent</th><th class="text-end">Marked</th><th class="text-end">Attendance %</th></tr></thead>
+    <tbody>
+      {% for r in division_rows %}
+      <tr>
+        <td>{{ r.division.school_class.name }}-{{ r.division.name }}</td>
+        <td class="text-end">{{ r.students }}</td>
+        <td class="text-end text-success">{{ r.present }}</td>
+        <td class="text-end text-danger">{{ r.absent }}</td>
+        <td class="text-end">{{ r.marked }}</td>
+        <td class="text-end fw-bold {{ 'text-danger' if r.pct < 75 }}">{{ r.pct }}%</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="text-muted text-center">No attendance in this period.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <table class="table table-sm table-striped align-middle">
+    <thead><tr><th>#</th><th>Adm No</th><th>Name</th><th>Class-Div</th><th class="text-end">Present</th>
+      <th class="text-end">Absent</th><th class="text-end">Marked</th><th class="text-end">Attendance %</th></tr></thead>
+    <tbody>
+      {% for r in student_rows %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ r.student.admission_no }}</td>
+        <td>{{ r.student.name }}</td>
+        <td>{{ r.student.school_class.name }}-{{ r.student.division.name }}</td>
+        <td class="text-end text-success">{{ r.present }}</td>
+        <td class="text-end text-danger">{{ r.absent }}</td>
+        <td class="text-end">{{ r.marked }}</td>
+        <td class="text-end fw-bold {{ 'text-danger' if r.pct < 75 and r.marked }}">{{ r.pct }}%</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="text-muted text-center">No students match, or no attendance in this period.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}

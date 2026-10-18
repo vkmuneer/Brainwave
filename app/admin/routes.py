@@ -79,6 +79,7 @@ from ..utils.excel import (
     parse_marks_upload,
     build_payments_template,
     parse_payments_upload,
+    build_simple_sheet,
 )
 from ..utils.pdf import render_pdf
 from ..utils.exam_analysis import compute_exam_results, build_report_context, student_progress
@@ -3119,3 +3120,127 @@ def home_video():
         return redirect(url_for("admin.home_video"))
 
     return render_template("admin/home_video.html", settings=settings)
+
+
+# -------------------------------------------------- attendance summary report
+def _compute_attendance_summary(args):
+    """Student-wise and division-wise attendance over a date range."""
+    today = date.today()
+    start_raw, end_raw = args.get("start"), args.get("end")
+    start = datetime.strptime(start_raw, "%Y-%m-%d").date() if start_raw else today.replace(day=1)
+    end = datetime.strptime(end_raw, "%Y-%m-%d").date() if end_raw else today
+    class_id = args.get("class_id", type=int)
+    division_id = args.get("division_id", type=int)
+
+    students = limit_students(Student.query.filter_by(active=True))
+    if class_id:
+        students = students.filter_by(class_id=class_id)
+    if division_id:
+        students = students.filter_by(division_id=division_id)
+    students = students.order_by(Student.name).all()
+    student_ids = [s.id for s in students] or [-1]
+
+    records = (
+        Attendance.query
+        .filter(Attendance.date >= start, Attendance.date <= end,
+                Attendance.student_id.in_(student_ids))
+        .all()
+    )
+    per_student = {}
+    for r in records:
+        d = per_student.setdefault(r.student_id, {"present": 0, "absent": 0})
+        d[r.status] = d.get(r.status, 0) + 1
+
+    student_rows = []
+    for s in students:
+        d = per_student.get(s.id, {"present": 0, "absent": 0})
+        marked = d["present"] + d["absent"]
+        pct = round(d["present"] / marked * 100, 1) if marked else 0.0
+        student_rows.append({
+            "student": s, "present": d["present"], "absent": d["absent"],
+            "marked": marked, "pct": pct,
+        })
+
+    div_agg = {}
+    for s in students:
+        d = per_student.get(s.id, {"present": 0, "absent": 0})
+        g = div_agg.setdefault(s.division_id, {"present": 0, "absent": 0, "students": 0})
+        g["present"] += d["present"]; g["absent"] += d["absent"]; g["students"] += 1
+    division_rows = []
+    for div in visible_divisions(Division.query.all()):
+        g = div_agg.get(div.id)
+        if not g or g["students"] == 0:
+            continue
+        marked = g["present"] + g["absent"]
+        pct = round(g["present"] / marked * 100, 1) if marked else 0.0
+        division_rows.append({
+            "division": div, "students": g["students"],
+            "present": g["present"], "absent": g["absent"], "marked": marked, "pct": pct,
+        })
+    division_rows.sort(key=lambda r: (r["division"].school_class.sort_key, r["division"].name))
+
+    label = f"{start.strftime('%d-%m-%Y')} to {end.strftime('%d-%m-%Y')}"
+    return {
+        "start": start, "end": end, "label": label,
+        "student_rows": student_rows, "division_rows": division_rows,
+        "class_id": class_id, "division_id": division_id,
+    }
+
+
+@admin_bp.route("/reports/attendance-summary")
+@login_required
+@office_required
+def attendance_summary():
+    data = _compute_attendance_summary(request.args)
+    view = request.args.get("view", "student")
+    return render_template(
+        "admin/attendance_summary.html",
+        classes=_classes_sorted(),
+        selected_class_id=data["class_id"],
+        selected_division_id=data["division_id"],
+        view=view, **data,
+    )
+
+
+@admin_bp.route("/reports/attendance-summary/excel")
+@login_required
+@office_required
+def attendance_summary_excel():
+    data = _compute_attendance_summary(request.args)
+    view = request.args.get("view", "student")
+    if view == "division":
+        headers = ["Class-Division", "Students", "Present", "Absent", "Marked", "Attendance %"]
+        rows = [[f"{r['division'].school_class.name}-{r['division'].name}", r["students"],
+                 r["present"], r["absent"], r["marked"], f"{r['pct']}%"] for r in data["division_rows"]]
+    else:
+        headers = ["Admission No", "Name", "Class-Division", "Present", "Absent", "Marked", "Attendance %"]
+        rows = [[r["student"].admission_no, r["student"].name,
+                 f"{r['student'].school_class.name}-{r['student'].division.name}",
+                 r["present"], r["absent"], r["marked"], f"{r['pct']}%"] for r in data["student_rows"]]
+    buffer = build_simple_sheet(f"Attendance {view}", headers, rows)
+    return send_file(buffer, as_attachment=True,
+                     download_name=f"attendance_{view}_{data['start']}_{data['end']}.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+@admin_bp.route("/reports/attendance-summary/pdf")
+@login_required
+@office_required
+def attendance_summary_pdf():
+    data = _compute_attendance_summary(request.args)
+    view = request.args.get("view", "student")
+    if view == "division":
+        columns = ["Class-Division", "Students", "Present", "Absent", "Marked", "Attendance %"]
+        rows = [[f"{r['division'].school_class.name}-{r['division'].name}", r["students"],
+                 r["present"], r["absent"], r["marked"], f"{r['pct']}%"] for r in data["division_rows"]]
+    else:
+        columns = ["Adm No", "Name", "Class-Div", "Present", "Absent", "Marked", "Attn %"]
+        rows = [[r["student"].admission_no, r["student"].name,
+                 f"{r['student'].school_class.name}-{r['student'].division.name}",
+                 r["present"], r["absent"], r["marked"], f"{r['pct']}%"] for r in data["student_rows"]]
+    return _pdf_response(
+        "pdf/generic_report_pdf.html",
+        f"attendance_{view}_{data['start']}_{data['end']}.pdf",
+        title=f"Attendance Report ({'Division-wise' if view=='division' else 'Student-wise'})",
+        meta=data["label"], columns=columns, rows=rows,
+    )

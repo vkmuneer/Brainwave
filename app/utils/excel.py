@@ -375,3 +375,35 @@ def parse_payments_upload(file_stream):
                 {"_row": row_idx, "admission_no": str(admission_no).strip(), "payments": payments}
             )
     return rows
+
+
+def build_simple_sheet(title, headers, rows, totals_row=None):
+    """A one-sheet workbook from headers + rows, returned as a BytesIO.
+
+    Reusable for any tabular download (attendance, accounts, teacher pay). Each
+    row is a list matching `headers`; an optional `totals_row` is appended bold.
+    """
+    from io import BytesIO
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = (title or "Report")[:31]
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+    for row in rows:
+        ws.append(list(row))
+    if totals_row is not None:
+        ws.append(list(totals_row))
+        for cell in ws[ws.max_row]:
+            cell.font = Font(bold=True)
+    for i, header in enumerate(headers, start=1):
+        width = max(12, len(str(header)) + 2,
+                    *(len(str(r[i-1])) + 2 for r in rows if i-1 < len(r))) if rows else max(12, len(str(header)) + 2)
+        ws.column_dimensions[get_column_letter(i)].width = min(width, 40)
+    ws.freeze_panes = "A2"
+
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer
