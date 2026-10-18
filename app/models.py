@@ -1166,3 +1166,28 @@ class IncomeEntry(db.Model):
 
     def __repr__(self):
         return f"<IncomeEntry {self.source} Rs.{self.amount}>"
+
+
+class TimetableSlot(db.Model):
+    """One cell of a division's weekly timetable: a subject and teacher for a
+    given day and period. Days are 0=Monday..5=Saturday; periods are 1..N.
+    """
+
+    __tablename__ = "timetable_slots"
+    __table_args__ = (
+        db.UniqueConstraint("division_id", "day", "period", name="uq_timetable_cell"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    division_id = db.Column(db.Integer, db.ForeignKey("divisions.id"), nullable=False)
+    day = db.Column(db.Integer, nullable=False)       # 0=Mon .. 5=Sat
+    period = db.Column(db.Integer, nullable=False)    # 1..N
+    subject_id = db.Column(db.Integer, db.ForeignKey("subjects.id"))
+    teacher_id = db.Column(db.Integer, db.ForeignKey("teachers.id"))
+
+    division = db.relationship("Division")
+    subject = db.relationship("Subject")
+    teacher = db.relationship("Teacher")
+
+    def __repr__(self):
+        return f"<TimetableSlot div={self.division_id} d{self.day} p{self.period}>"

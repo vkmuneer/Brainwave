@@ -52,6 +52,7 @@ from ..models import (
     TeacherPayment,
     ExpenseEntry,
     IncomeEntry,
+    TimetableSlot,
 )
 from ..utils.decorators import admin_required, office_required
 from ..utils.scope import (
@@ -3592,4 +3593,87 @@ def payroll_payslip(teacher_id):
         summary_lines=[("Monthly salary", f"Rs. {teacher.monthly_salary or 0:,.0f}"),
                        ("Paid this month", f"Rs. {paid:,.0f}"),
                        ("Balance", f"Rs. {(teacher.monthly_salary or 0) - paid:,.0f}")],
+    )
+
+
+# -------------------------------------------------- timetable
+DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+PERIODS = list(range(1, 7))
+
+
+def _division_grid(division_id):
+    """{(day, period): slot} for one division."""
+    slots = TimetableSlot.query.filter_by(division_id=division_id).all()
+    return {(sl.day, sl.period): sl for sl in slots}
+
+
+@admin_bp.route("/timetable", methods=["GET", "POST"])
+@login_required
+@office_required
+def timetable():
+    division_id = request.values.get("division_id", type=int)
+    division = Division.query.get(division_id) if division_id else None
+    if division is not None:
+        ensure_division_visible(division)
+
+    if request.method == "POST" and division is not None:
+        existing = _division_grid(division.id)
+        conflicts = []
+        for day in range(len(DAY_NAMES)):
+            for period in PERIODS:
+                subj = request.form.get(f"s_{day}_{period}", type=int)
+                teacher_id = request.form.get(f"t_{day}_{period}", type=int)
+                slot = existing.get((day, period))
+                if not subj and not teacher_id:
+                    if slot:
+                        db.session.delete(slot)
+                    continue
+                if slot is None:
+                    slot = TimetableSlot(division_id=division.id, day=day, period=period)
+                    db.session.add(slot)
+                slot.subject_id = subj or None
+                slot.teacher_id = teacher_id or None
+                # Warn if this teacher is already booked elsewhere at this time.
+                if teacher_id:
+                    clash = (TimetableSlot.query
+                             .filter(TimetableSlot.teacher_id == teacher_id,
+                                     TimetableSlot.day == day, TimetableSlot.period == period,
+                                     TimetableSlot.division_id != division.id).first())
+                    if clash:
+                        conflicts.append(
+                            f"{DAY_NAMES[day]} P{period}: teacher also in "
+                            f"{clash.division.school_class.name}-{clash.division.name}")
+        db.session.commit()
+        if conflicts:
+            flash("Saved, but note these clashes - " + "; ".join(conflicts[:6]), "warning")
+        else:
+            flash("Timetable saved.", "success")
+        return redirect(url_for("admin.timetable", division_id=division.id))
+
+    return render_template(
+        "admin/timetable.html",
+        classes=_classes_sorted(),
+        divisions=visible_divisions(Division.query.all()),
+        division=division,
+        grid=_division_grid(division.id) if division else {},
+        days=list(enumerate(DAY_NAMES)), periods=PERIODS,
+        subjects=_subjects_sorted(),
+        teachers=Teacher.query.filter_by(active=True).order_by(Teacher.name).all(),
+    )
+
+
+@admin_bp.route("/timetable/teacher/<int:teacher_id>")
+@login_required
+@office_required
+def timetable_teacher(teacher_id):
+    teacher = Teacher.query.get_or_404(teacher_id)
+    slots = TimetableSlot.query.filter_by(teacher_id=teacher.id).all()
+    grid = {}
+    for sl in slots:
+        grid.setdefault((sl.day, sl.period), []).append(sl)
+    return render_template(
+        "admin/timetable_teacher.html",
+        teacher=teacher, grid=grid,
+        days=list(enumerate(DAY_NAMES)), periods=PERIODS,
+        teachers=Teacher.query.filter_by(active=True).order_by(Teacher.name).all(),
     )

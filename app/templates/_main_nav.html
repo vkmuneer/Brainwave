@@ -85,6 +85,7 @@
         </li>
 
         <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.exams') }}"><i class="bi bi-journal-text"></i> Exams</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.timetable') }}"><i class="bi bi-calendar3-week"></i> Timetable</a></li>
 
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
@@ -168,6 +169,7 @@
         <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher.attendance') }}">Attendance</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher.students') }}">My Students</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher.exams') }}"><i class="bi bi-journal-text"></i> Examinations</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher.timetable') }}"><i class="bi bi-calendar3-week"></i> Timetable</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher.videos') }}"><i class="bi bi-play-btn"></i> Videos</a></li>
         {% endif %}
       </ul>

@@ -508,3 +508,21 @@ def video_delete(video_id):
     db.session.commit()
     flash("Video removed.", "info")
     return redirect(url_for("teacher.videos"))
+
+
+DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+PERIODS = list(range(1, 7))
+
+
+@teacher_bp.route("/timetable")
+@login_required
+def timetable():
+    from ..models import TimetableSlot
+
+    teacher = current_user.teacher
+    grid = {}
+    if teacher is not None:
+        for sl in TimetableSlot.query.filter_by(teacher_id=teacher.id).all():
+            grid.setdefault((sl.day, sl.period), []).append(sl)
+    return render_template("teacher/timetable.html", grid=grid,
+                           days=list(enumerate(DAY_NAMES)), periods=PERIODS)

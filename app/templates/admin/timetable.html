@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Timetable{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <h4 class="text-bw-teal m-0"><i class="bi bi-calendar3-week"></i> Timetable</h4>
+  {% if teachers %}
+  <div class="input-group input-group-sm no-print" style="max-width:320px;">
+    <span class="input-group-text">Teacher view</span>
+    <select class="form-select"
+            onchange="if(this.value) window.location='{{ url_for('admin.timetable_teacher', teacher_id=0) }}'.slice(0,-1)+this.value;">
+      <option value="">Choose teacher...</option>
+      {% for t in teachers %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+    </select>
+  </div>
+  {% endif %}
+</div>
+
+<form method="get" class="mb-3 no-print" style="max-width:360px;">
+  <label class="form-label small mb-0">Division</label>
+  <select name="division_id" class="form-select" onchange="this.form.submit()">
+    <option value="">Choose a division...</option>
+    {% for d in divisions %}
+    <option value="{{ d.id }}" {{ 'selected' if division and division.id == d.id }}>
+      {{ d.school_class.name }}-{{ d.name }}</option>
+    {% endfor %}
+  </select>
+</form>
+
+{% if division %}
+<h6 class="text-bw-teal">{{ division.school_class.name }}-{{ division.name }} timetable
+  <button class="btn btn-sm btn-outline-secondary no-print" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+</h6>
+<form method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="division_id" value="{{ division.id }}">
+  <div class="table-responsive">
+    <table class="table table-bordered align-middle" style="font-size:.82rem;">
+      <thead class="table-light"><tr><th>Period</th>{% for i, dn in days %}<th>{{ dn }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for p in periods %}
+        <tr>
+          <th class="table-light">P{{ p }}</th>
+          {% for i, dn in days %}
+          {% set slot = grid.get((i, p)) %}
+          <td style="min-width:150px;">
+            <select name="s_{{ i }}_{{ p }}" class="form-select form-select-sm mb-1">
+              <option value="">- subject -</option>
+              {% for s in subjects %}<option value="{{ s.id }}" {{ 'selected' if slot and slot.subject_id == s.id }}>{{ s.name }}</option>{% endfor %}
+            </select>
+            <select name="t_{{ i }}_{{ p }}" class="form-select form-select-sm">
+              <option value="">- teacher -</option>
+              {% for t in teachers %}<option value="{{ t.id }}" {{ 'selected' if slot and slot.teacher_id == t.id }}>{{ t.name }}</option>{% endfor %}
+            </select>
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <button class="btn btn-bw-primary no-print"><i class="bi bi-check-lg"></i> Save timetable</button>
+</form>
+<p class="text-muted small mt-2 no-print">Leave both boxes blank to clear a period. If a teacher is already booked elsewhere at the same time, saving still works but you'll get a clash warning.</p>
+{% else %}
+<p class="text-muted">Choose a division to view or edit its timetable.</p>
+{% endif %}
+{% endblock %}
