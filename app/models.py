@@ -1026,3 +1026,26 @@ class GalleryImage(db.Model):
 
     def __repr__(self):
         return f"<GalleryImage {self.id}>"
+
+
+class BannerImage(db.Model):
+    """A wide image shown in the rotating banner at the top of the home page.
+
+    Managed by the admin. 'active' hides one without deleting it; 'sort_order'
+    sets the slide order (lower first). Stored in the database like the logo and
+    gallery, so one backup of brainwave.db carries the banners too.
+    """
+
+    __tablename__ = "banner_images"
+
+    id = db.Column(db.Integer, primary_key=True)
+    image_data = db.Column(db.LargeBinary, nullable=False)
+    image_mimetype = db.Column(db.String(40), nullable=False)
+    caption = db.Column(db.String(200))
+    link_url = db.Column(db.String(255))
+    sort_order = db.Column(db.Integer, default=100, nullable=False)
+    active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    def __repr__(self):
+        return f"<BannerImage {self.id}>"

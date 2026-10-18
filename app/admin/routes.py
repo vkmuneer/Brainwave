@@ -47,6 +47,7 @@ from ..models import (
     Assignment,
     AssignmentSubmission,
     GalleryImage,
+    BannerImage,
 )
 from ..utils.decorators import admin_required, office_required
 from ..utils.scope import (
@@ -2913,3 +2914,68 @@ def gallery_delete(image_id):
     db.session.commit()
     flash("Photo removed from the gallery.", "success")
     return redirect(url_for("admin.gallery"))
+
+
+# ------------------------------------------------------------------ banners
+@admin_bp.route("/banners", methods=["GET", "POST"])
+@login_required
+@admin_required
+def banners():
+    """Manage the rotating image banner on the public home page."""
+    if request.method == "POST":
+        data, mimetype, error = read_image_upload(request.files.get("image"))
+        if error:
+            flash(error, "danger")
+            return redirect(url_for("admin.banners"))
+        if data is None:
+            flash("Choose an image to add.", "danger")
+            return redirect(url_for("admin.banners"))
+        last = db.session.query(func.max(BannerImage.sort_order)).scalar() or 0
+        db.session.add(BannerImage(
+            image_data=data,
+            image_mimetype=mimetype,
+            caption=request.form.get("caption", "").strip()[:200],
+            link_url=request.form.get("link_url", "").strip()[:255],
+            sort_order=last + 10,
+        ))
+        db.session.commit()
+        flash("Banner added.", "success")
+        return redirect(url_for("admin.banners"))
+
+    images = BannerImage.query.order_by(BannerImage.sort_order, BannerImage.created_at).all()
+    return render_template("admin/banners.html", images=images)
+
+
+@admin_bp.route("/banners/<int:banner_id>/update", methods=["POST"])
+@login_required
+@admin_required
+def banner_update(banner_id):
+    banner = BannerImage.query.get_or_404(banner_id)
+    banner.caption = request.form.get("caption", "").strip()[:200]
+    banner.link_url = request.form.get("link_url", "").strip()[:255]
+    banner.sort_order = request.form.get("sort_order", type=int) or banner.sort_order
+    db.session.commit()
+    flash("Banner updated.", "success")
+    return redirect(url_for("admin.banners"))
+
+
+@admin_bp.route("/banners/<int:banner_id>/toggle", methods=["POST"])
+@login_required
+@admin_required
+def banner_toggle(banner_id):
+    banner = BannerImage.query.get_or_404(banner_id)
+    banner.active = not banner.active
+    db.session.commit()
+    flash("Banner updated.", "success")
+    return redirect(url_for("admin.banners"))
+
+
+@admin_bp.route("/banners/<int:banner_id>/delete", methods=["POST"])
+@login_required
+@admin_required
+def banner_delete(banner_id):
+    banner = BannerImage.query.get_or_404(banner_id)
+    db.session.delete(banner)
+    db.session.commit()
+    flash("Banner removed.", "success")
+    return redirect(url_for("admin.banners"))

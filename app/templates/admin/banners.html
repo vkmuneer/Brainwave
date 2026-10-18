@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Home Banners{% endblock %}
+{% block content %}
+<h4 class="text-bw-teal mb-3"><i class="bi bi-image"></i> Home Page Banners</h4>
+
+<div class="card bw-card mb-4" style="max-width: 640px;">
+  <div class="card-body">
+    <h6 class="text-bw-teal">Add a banner</h6>
+    <p class="text-muted small">
+      Active banners rotate as a slider at the top of the public home page. A wide
+      landscape image (about 1600&times;600) looks best. Add up to four or five.
+    </p>
+    <form method="post" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-3">
+        <label class="form-label">Image</label>
+        <input type="file" name="image" class="form-control" accept="image/png,image/jpeg,image/webp" required>
+        <div class="form-text">PNG, JPG or WebP up to 2 MB.</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Caption <span class="text-muted">(optional)</span></label>
+        <input type="text" name="caption" class="form-control" maxlength="200"
+               placeholder="Admissions open for 2026-27">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Link when clicked <span class="text-muted">(optional)</span></label>
+        <input type="url" name="link_url" class="form-control" maxlength="255"
+               placeholder="https://...">
+      </div>
+      <button type="submit" class="btn btn-bw-primary"><i class="bi bi-upload"></i> Add banner</button>
+    </form>
+  </div>
+</div>
+
+<h6 class="text-bw-teal">{{ images|length }} banner{{ '' if images|length == 1 else 's' }}</h6>
+<div class="row g-3">
+  {% for img in images %}
+  <div class="col-12 col-md-6">
+    <div class="card bw-card h-100">
+      <img src="{{ url_for('public.banner_image', banner_id=img.id) }}" alt=""
+           class="card-img-top" style="aspect-ratio:16/6;object-fit:cover;{% if not img.active %}opacity:.4;{% endif %}">
+      <div class="card-body">
+        {% if not img.active %}<span class="badge bg-secondary mb-2">Hidden</span>{% endif %}
+        <form method="post" action="{{ url_for('admin.banner_update', banner_id=img.id) }}" class="row g-2 align-items-end">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="col-12">
+            <label class="form-label small mb-0">Caption</label>
+            <input type="text" name="caption" class="form-control form-control-sm" maxlength="200"
+                   value="{{ img.caption or '' }}">
+          </div>
+          <div class="col-8">
+            <label class="form-label small mb-0">Link</label>
+            <input type="url" name="link_url" class="form-control form-control-sm" maxlength="255"
+                   value="{{ img.link_url or '' }}">
+          </div>
+          <div class="col-4">
+            <label class="form-label small mb-0">Order</label>
+            <input type="number" name="sort_order" class="form-control form-control-sm" value="{{ img.sort_order }}">
+          </div>
+          <div class="col-12">
+            <button class="btn btn-sm btn-bw-primary">Save</button>
+          </div>
+        </form>
+        <div class="d-flex gap-2 mt-2">
+          <form method="post" action="{{ url_for('admin.banner_toggle', banner_id=img.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-secondary">{{ 'Hide' if img.active else 'Show' }}</button>
+          </form>
+          <form method="post" action="{{ url_for('admin.banner_delete', banner_id=img.id) }}"
+                onsubmit="return confirm('Remove this banner?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-danger">Delete</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12"><p class="text-muted">No banners yet. Add the first one above.</p></div>
+  {% endfor %}
+</div>
+{% endblock %}

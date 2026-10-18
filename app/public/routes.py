@@ -20,7 +20,14 @@ def home():
     """
     from ..models import SchoolClass, Subject, Teacher, Course, CLASS_ORDER
 
+    from ..models import BannerImage
+
     settings = Settings.get()
+    banners = (
+        BannerImage.query.filter_by(active=True)
+        .order_by(BannerImage.sort_order, BannerImage.created_at)
+        .all()
+    )
     faculty = (
         Teacher.query.filter_by(active=True, show_on_website=True)
         .order_by(Teacher.display_order, Teacher.name)
@@ -94,6 +101,7 @@ def home():
         courses=Course.query.filter_by(published=True).order_by(Course.title).limit(6).all(),
         portal_open=settings.student_login_enabled,
         faculty=faculty,
+        banners=banners,
     )
 
 
@@ -159,6 +167,18 @@ def gallery():
         .all()
     )
     return render_template("public/gallery.html", settings=Settings.get(), images=images)
+
+
+@public_bp.route("/banner/image/<int:banner_id>")
+def banner_image(banner_id):
+    from ..models import BannerImage
+
+    banner = BannerImage.query.get(banner_id)
+    if banner is None or not banner.image_data:
+        abort(404)
+    response = send_file(BytesIO(banner.image_data), mimetype=banner.image_mimetype or "image/jpeg")
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return response
 
 
 @public_bp.route("/gallery/image/<int:image_id>")
