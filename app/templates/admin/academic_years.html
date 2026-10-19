@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Academic Years{% endblock %}
+{% block content %}
+<h4 class="text-bw-teal mb-3"><i class="bi bi-mortarboard"></i> Academic Years</h4>
+<p class="text-muted small" style="max-width:640px;">
+  New fees, exams and accounts entries are recorded under the year selected in the top bar,
+  and the Fee Collection, Accounts and Exams screens filter to it. Set which year is current -
+  that's the one everyone starts on.
+</p>
+
+<div class="card bw-card mb-4" style="max-width: 440px;">
+  <div class="card-body">
+    <h6 class="text-bw-teal">Add a year</h6>
+    <form method="post" class="row g-2 align-items-end">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-7">
+        <label class="form-label small mb-0">Year</label>
+        <input type="text" name="label" class="form-control" maxlength="20" placeholder="2027-2028" required>
+      </div>
+      <div class="col-5">
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" name="is_current" id="is_current">
+          <label class="form-check-label small" for="is_current">Make current</label>
+        </div>
+        <button class="btn btn-sm btn-bw-primary w-100">Add</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="table-responsive" style="max-width: 440px;">
+  <table class="table table-sm align-middle">
+    <thead><tr><th>Year</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      {% for y in years %}
+      <tr>
+        <td class="fw-bold">{{ y.label }}</td>
+        <td>{% if y.is_current %}<span class="badge bg-success">Current</span>{% else %}<span class="text-muted">-</span>{% endif %}</td>
+        <td>
+          {% if not y.is_current %}
+          <form method="post" action="{{ url_for('admin.academic_year_set_current', year_id=y.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-secondary py-0">Set current</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

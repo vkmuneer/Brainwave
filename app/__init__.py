@@ -153,6 +153,12 @@ def create_app(config_class=Config):
         pending_feedback = 0
         pending_subs = 0
         open_questions = 0
+        academic_years, active_year = [], None
+        if current_user.is_authenticated and current_user.is_office_staff:
+            from .models import AcademicYear
+            from .utils.academic_year import active_academic_year
+            academic_years = AcademicYear.query.order_by(AcademicYear.label.desc()).all()
+            active_year = active_academic_year()
         if current_user.is_authenticated and current_user.is_office_staff:
             from .models import Feedback, Subscription
 
@@ -174,6 +180,8 @@ def create_app(config_class=Config):
             "pending_feedback_count": pending_feedback,
             "pending_subscription_count": pending_subs,
             "open_question_count": open_questions,
+            "academic_years": academic_years,
+            "active_year": active_year,
         }
 
     with app.app_context():
@@ -190,6 +198,8 @@ def create_app(config_class=Config):
         _ensure_seed_data(app)
         _seed_branches(app)
         _seed_fee_schedules(app)
+        _seed_academic_year(app)
+        _backfill_academic_year(app)
 
     register_cli(app)
 
@@ -521,3 +531,35 @@ def register_cli(app):
         user.set_password(password)
         db.session.commit()
         click.echo(f"Password updated for '{user.username}' ({user.role}).")
+
+
+def _seed_academic_year(app):
+    """Ensure one academic year exists and is marked current."""
+    from .models import AcademicYear
+
+    if AcademicYear.query.first() is None:
+        db.session.add(AcademicYear(label="2026-2027", is_current=True))
+        db.session.commit()
+        app.logger.info("[seed] created academic year 2026-2027")
+    elif AcademicYear.query.filter_by(is_current=True).first() is None:
+        year = AcademicYear.query.order_by(AcademicYear.label.desc()).first()
+        year.is_current = True
+        db.session.commit()
+
+
+def _backfill_academic_year(app):
+    """Stamp pre-existing transactions with the current year, once."""
+    from .models import AcademicYear, FeePayment, Exam, TeacherPayment, ExpenseEntry, IncomeEntry
+
+    current = AcademicYear.current()
+    if current is None:
+        return
+    changed = 0
+    for model in (FeePayment, Exam, TeacherPayment, ExpenseEntry, IncomeEntry):
+        rows = model.query.filter(model.academic_year_id.is_(None)).all()
+        for r in rows:
+            r.academic_year_id = current.id
+        changed += len(rows)
+    if changed:
+        db.session.commit()
+        app.logger.info("[backfill] stamped %d records with year %s", changed, current.label)

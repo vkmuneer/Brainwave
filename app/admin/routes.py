@@ -53,6 +53,7 @@ from ..models import (
     ExpenseEntry,
     IncomeEntry,
     TimetableSlot,
+    AcademicYear,
 )
 from ..utils.decorators import admin_required, office_required
 from ..utils.scope import (
@@ -89,6 +90,7 @@ from ..utils.pdf import render_pdf
 from ..utils.exam_analysis import compute_exam_results, build_report_context, student_progress
 from ..utils.video import is_acceptable_link
 from ..utils.images import read_image_upload
+from ..utils.academic_year import active_academic_year_id, active_academic_year
 from ..utils.media import save_home_video, delete_media
 
 
@@ -411,6 +413,7 @@ def add_payment(student_id):
         mode=request.form.get("mode", "Cash"),
         remarks=request.form.get("remarks", "").strip(),
         recorded_by=current_user.name,
+        academic_year_id=active_academic_year_id(),
     )
     db.session.add(payment)
     db.session.commit()
@@ -700,6 +703,10 @@ def _compute_finance_report(args):
     # Keep each branch's collection to itself - an office coordinator must not
     # see the other branch's receipts, and an admin can pick one branch.
     payments_query = scope_payments(payments_query, class_ids)
+    year_id = active_academic_year_id()
+    if year_id:
+        payments_query = payments_query.filter(
+            db.or_(FeePayment.academic_year_id == year_id, FeePayment.academic_year_id.is_(None)))
     if q:
         like = f"%{q}%"
         payments_query = payments_query.join(Student).filter(
@@ -1420,6 +1427,7 @@ def payments_bulk_upload():
                     mode=mode,
                     remarks="Bulk upload",
                     recorded_by=current_user.name,
+                    academic_year_id=active_academic_year_id(),
                 )
                 db.session.add(payment)
                 db.session.flush()
@@ -2193,7 +2201,12 @@ def delete_school(school_id):
 @login_required
 @office_required
 def exams():
-    exam_list = Exam.query.order_by(Exam.exam_date.desc()).all()
+    query = Exam.query.order_by(Exam.exam_date.desc())
+    year_id = active_academic_year_id()
+    if year_id:
+        # Show this year's exams, plus any legacy exam with no year set.
+        query = query.filter(db.or_(Exam.academic_year_id == year_id, Exam.academic_year_id.is_(None)))
+    exam_list = query.all()
     class_ids = visible_class_ids()
     if class_ids is not None:
         exam_list = [e for e in exam_list if e.class_id in class_ids]
@@ -2219,6 +2232,7 @@ def exam_form():
             class_id=class_id,
             exam_date=datetime.strptime(exam_date_raw, "%Y-%m-%d").date() if exam_date_raw else date.today(),
             description=description,
+            academic_year_id=active_academic_year_id(),
         )
         db.session.add(exam)
         db.session.commit()
@@ -3273,6 +3287,7 @@ def teacher_payments():
                 period=request.form.get("period", "").strip()[:40],
                 mode=request.form.get("mode", "Cash").strip()[:20] or "Cash",
                 paid_by=current_user.name,
+                academic_year_id=active_academic_year_id(),
             ))
             db.session.commit()
             flash(f"Recorded Rs. {amount:,.0f} paid to {teacher.name}.", "success")
@@ -3351,6 +3366,7 @@ def expenses():
                 payee=request.form.get("payee", "").strip()[:120],
                 mode=request.form.get("mode", "Cash").strip()[:20] or "Cash",
                 recorded_by=current_user.name,
+                academic_year_id=active_academic_year_id(),
             ))
             db.session.commit()
             flash(f"Expense of Rs. {amount:,.0f} recorded.", "success")
@@ -3405,6 +3421,7 @@ def other_income():
                 received_from=request.form.get("received_from", "").strip()[:120],
                 mode=request.form.get("mode", "Cash").strip()[:20] or "Cash",
                 recorded_by=current_user.name,
+                academic_year_id=active_academic_year_id(),
             ))
             db.session.commit()
             flash(f"Income of Rs. {amount:,.0f} recorded.", "success")
@@ -3446,14 +3463,22 @@ def _compute_accounts(args):
     start = _parse_date(args.get("start")) if args.get("start") else today.replace(day=1)
     end = _parse_date(args.get("end")) if args.get("end") else today
 
-    fees = db.session.query(func.coalesce(func.sum(FeePayment.amount), 0)).filter(
-        FeePayment.payment_date >= start, FeePayment.payment_date <= end).scalar() or 0
-    other_income_rows = IncomeEntry.query.filter(
-        IncomeEntry.income_date >= start, IncomeEntry.income_date <= end).all()
-    teacher_pay = db.session.query(func.coalesce(func.sum(TeacherPayment.amount), 0)).filter(
-        TeacherPayment.pay_date >= start, TeacherPayment.pay_date <= end).scalar() or 0
-    expense_rows = ExpenseEntry.query.filter(
-        ExpenseEntry.expense_date >= start, ExpenseEntry.expense_date <= end).all()
+    yid = active_academic_year_id()
+    fee_q = db.session.query(func.coalesce(func.sum(FeePayment.amount), 0)).filter(
+        FeePayment.payment_date >= start, FeePayment.payment_date <= end)
+    inc_q = IncomeEntry.query.filter(IncomeEntry.income_date >= start, IncomeEntry.income_date <= end)
+    tp_q = db.session.query(func.coalesce(func.sum(TeacherPayment.amount), 0)).filter(
+        TeacherPayment.pay_date >= start, TeacherPayment.pay_date <= end)
+    exp_q = ExpenseEntry.query.filter(ExpenseEntry.expense_date >= start, ExpenseEntry.expense_date <= end)
+    if yid:
+        fee_q = fee_q.filter(db.or_(FeePayment.academic_year_id == yid, FeePayment.academic_year_id.is_(None)))
+        inc_q = inc_q.filter(db.or_(IncomeEntry.academic_year_id == yid, IncomeEntry.academic_year_id.is_(None)))
+        tp_q = tp_q.filter(db.or_(TeacherPayment.academic_year_id == yid, TeacherPayment.academic_year_id.is_(None)))
+        exp_q = exp_q.filter(db.or_(ExpenseEntry.academic_year_id == yid, ExpenseEntry.academic_year_id.is_(None)))
+    fees = fee_q.scalar() or 0
+    other_income_rows = inc_q.all()
+    teacher_pay = tp_q.scalar() or 0
+    expense_rows = exp_q.all()
 
     income_by = {"Student fees": fees}
     for r in other_income_rows:
@@ -3677,3 +3702,49 @@ def timetable_teacher(teacher_id):
         days=list(enumerate(DAY_NAMES)), periods=PERIODS,
         teachers=Teacher.query.filter_by(active=True).order_by(Teacher.name).all(),
     )
+
+
+# -------------------------------------------------- academic year
+@admin_bp.route("/set-academic-year", methods=["POST"])
+@login_required
+@office_required
+def set_academic_year():
+    from flask import session
+    year_id = request.form.get("academic_year_id", type=int)
+    if year_id and AcademicYear.query.get(year_id):
+        session["academic_year_id"] = year_id
+    return redirect(request.referrer or url_for("admin.dashboard"))
+
+
+@admin_bp.route("/academic-years", methods=["GET", "POST"])
+@login_required
+@admin_required
+def academic_years():
+    if request.method == "POST":
+        label = request.form.get("label", "").strip()[:20]
+        if not label:
+            flash("Enter the year, e.g. 2027-2028.", "danger")
+        elif AcademicYear.query.filter_by(label=label).first():
+            flash("That year already exists.", "danger")
+        else:
+            make_current = bool(request.form.get("is_current"))
+            if make_current:
+                AcademicYear.query.update({AcademicYear.is_current: False})
+            db.session.add(AcademicYear(label=label, is_current=make_current))
+            db.session.commit()
+            flash(f"Academic year {label} added.", "success")
+        return redirect(url_for("admin.academic_years"))
+    years = AcademicYear.query.order_by(AcademicYear.label.desc()).all()
+    return render_template("admin/academic_years.html", years=years)
+
+
+@admin_bp.route("/academic-years/<int:year_id>/set-current", methods=["POST"])
+@login_required
+@admin_required
+def academic_year_set_current(year_id):
+    year = AcademicYear.query.get_or_404(year_id)
+    AcademicYear.query.update({AcademicYear.is_current: False})
+    year.is_current = True
+    db.session.commit()
+    flash(f"{year.label} is now the current academic year.", "success")
+    return redirect(url_for("admin.academic_years"))

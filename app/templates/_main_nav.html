@@ -126,6 +126,7 @@
             <li><a class="dropdown-item" href="{{ url_for('admin.teachers') }}">Teachers</a></li>
             <li><a class="dropdown-item" href="{{ url_for('admin.office_staff') }}">Office Staff</a></li>
             <li><a class="dropdown-item" href="{{ url_for('admin.classes') }}">Classes &amp; Fee Plans</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('admin.academic_years') }}">Academic Years</a></li>
             <li><a class="dropdown-item" href="{{ url_for('admin.masters') }}">Master Data</a></li>
             <li><a class="dropdown-item" href="{{ url_for('admin.gallery') }}">Gallery</a></li>
             <li><a class="dropdown-item" href="{{ url_for('admin.banners') }}">Home Banners</a></li>
@@ -178,6 +179,19 @@
         <input type="search" name="q" class="form-control form-control-sm" placeholder="Search students..." style="min-width: 200px;">
         <button class="btn btn-sm btn-light ms-1" type="submit"><i class="bi bi-search"></i></button>
       </form>
+      {% if academic_years and current_user.is_office_staff %}
+      <form method="post" action="{{ url_for('admin.set_academic_year') }}"
+            class="d-flex align-items-center mx-md-2 my-2 my-md-0" title="Academic year">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <span class="navbar-text text-white me-1"><i class="bi bi-mortarboard-fill"></i></span>
+        <select name="academic_year_id" class="form-select form-select-sm" style="width:auto;"
+                onchange="this.form.submit()">
+          {% for y in academic_years %}
+          <option value="{{ y.id }}" {{ 'selected' if active_year and active_year.id == y.id }}>{{ y.label }}</option>
+          {% endfor %}
+        </select>
+      </form>
+      {% endif %}
       <ul class="navbar-nav bw-account-nav">
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle d-inline-flex align-items-center gap-2" href="#" role="button" data-bs-toggle="dropdown">

@@ -344,6 +344,7 @@ class FeePayment(db.Model):
     receipt_no = db.Column(db.String(30))
     remarks = db.Column(db.String(255))
     recorded_by = db.Column(db.String(120))
+    academic_year_id = db.Column(db.Integer, db.ForeignKey("academic_years.id"), index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):
@@ -688,6 +689,7 @@ class Exam(db.Model):
     class_id = db.Column(db.Integer, db.ForeignKey("school_classes.id"), nullable=False)
     exam_date = db.Column(db.Date, default=date.today, nullable=False)
     description = db.Column(db.String(255))
+    academic_year_id = db.Column(db.Integer, db.ForeignKey("academic_years.id"), index=True)
 
     school_class = db.relationship("SchoolClass", backref="exams")
     exam_subjects = db.relationship(
@@ -1115,6 +1117,7 @@ class TeacherPayment(db.Model):
     period = db.Column(db.String(40))            # optional month/label
     mode = db.Column(db.String(20), default="Cash", nullable=False)
     paid_by = db.Column(db.String(120))
+    academic_year_id = db.Column(db.Integer, db.ForeignKey("academic_years.id"), index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     teacher = db.relationship("Teacher")
@@ -1140,6 +1143,7 @@ class ExpenseEntry(db.Model):
     payee = db.Column(db.String(120))                         # vendor / who was paid
     mode = db.Column(db.String(20), default="Cash", nullable=False)
     recorded_by = db.Column(db.String(120))
+    academic_year_id = db.Column(db.Integer, db.ForeignKey("academic_years.id"), index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     def __repr__(self):
@@ -1162,6 +1166,7 @@ class IncomeEntry(db.Model):
     received_from = db.Column(db.String(120))
     mode = db.Column(db.String(20), default="Cash", nullable=False)
     recorded_by = db.Column(db.String(120))
+    academic_year_id = db.Column(db.Integer, db.ForeignKey("academic_years.id"), index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     def __repr__(self):
@@ -1191,3 +1196,23 @@ class TimetableSlot(db.Model):
 
     def __repr__(self):
         return f"<TimetableSlot div={self.division_id} d{self.day} p{self.period}>"
+
+
+class AcademicYear(db.Model):
+    """An academic year such as 2026-2027. Transactions (fees, exams, accounts)
+    are stamped with one, and staff pick the working year from a selector.
+    """
+
+    __tablename__ = "academic_years"
+
+    id = db.Column(db.Integer, primary_key=True)
+    label = db.Column(db.String(20), unique=True, nullable=False)   # "2026-2027"
+    is_current = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    @classmethod
+    def current(cls):
+        return cls.query.filter_by(is_current=True).first() or cls.query.order_by(cls.label.desc()).first()
+
+    def __repr__(self):
+        return f"<AcademicYear {self.label}>"
