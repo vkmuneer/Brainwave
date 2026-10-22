@@ -516,6 +516,7 @@ PERIODS = list(range(1, 7))
 
 @teacher_bp.route("/timetable")
 @login_required
+@teacher_required
 def timetable():
     from ..models import TimetableSlot
 

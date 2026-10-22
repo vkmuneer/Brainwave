@@ -1995,6 +1995,10 @@ def broadcast():
 @office_required
 def mark_message_sent(message_id):
     log = MessageLog.query.get_or_404(message_id)
+    # Without this an office coordinator could flip a message belonging to the
+    # other branch by guessing its id.
+    if log.student is not None:
+        ensure_student_visible(log.student)
     log.status = "sent"
     log.detail = f"Marked as sent manually by {current_user.name}"
     db.session.commit()

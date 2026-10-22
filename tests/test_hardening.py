@@ -138,3 +138,36 @@ def test_changing_to_a_short_password_is_refused(client, app, data):
     )
     with app.app_context():
         assert User.query.filter_by(username="office1").first().check_password("Office@123")
+
+
+def test_office_cannot_touch_the_other_branch_message(client, app, data):
+    """Marking a message sent must respect branch scope.
+
+    The route took any message id and flipped its status, so a coordinator
+    could reach across to the other branch's message log.
+    """
+    from app.extensions import db
+    from app.models import Student, MessageLog
+
+    with app.app_context():
+        other = Student.query.filter_by(admission_no="S3").first()   # Higher Secondary
+        log = MessageLog(student_id=other.id, phone="919000000003",
+                         message="hello", status="pending")
+        db.session.add(log)
+        db.session.commit()
+        log_id = log.id
+
+    login(client, "office1", "Office@123")        # High School coordinator
+    assert client.post(f"/admin/messages/{log_id}/mark-sent").status_code == 403
+    with app.app_context():
+        assert MessageLog.query.get(log_id).status == "pending"
+
+
+def test_teacher_timetable_is_teachers_only(client, app, data):
+    """The teacher timetable route carried only @login_required."""
+    login(client, "office1", "Office@123")
+    assert client.get("/teacher/timetable").status_code == 403
+
+    teacher_client = app.test_client()          # a fresh session, not the office one
+    login(teacher_client, "teach1", "Teach@123")
+    assert teacher_client.get("/teacher/timetable").status_code == 200
