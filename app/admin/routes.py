@@ -551,7 +551,7 @@ def delete_payment(payment_id):
 # ----------------------------------------------------------------- teachers
 @admin_bp.route("/teachers")
 @login_required
-@admin_required
+@office_required
 def teachers():
     teacher_list = Teacher.query.order_by(Teacher.name).all()
     return render_template("admin/teachers.html", teachers=teacher_list)
@@ -612,6 +612,22 @@ def teacher_form(teacher_id=None):
     return render_template(
         "admin/teacher_form.html", teacher=teacher, classes=_classes_sorted(), subjects=_subjects_sorted()
     )
+
+
+@admin_bp.route("/teachers/<int:teacher_id>/hourly-rate", methods=["POST"])
+@login_required
+@office_required
+def teacher_set_rate(teacher_id):
+    """Admin and office both set a teacher's hourly remuneration."""
+    teacher = Teacher.query.get_or_404(teacher_id)
+    rate = request.form.get("hourly_rate", type=float)
+    if rate is None or rate < 0:
+        flash("Enter an hourly rate of zero or more.", "danger")
+    else:
+        teacher.hourly_rate = rate
+        db.session.commit()
+        flash(f"Hourly rate for {teacher.name} set to Rs. {rate:,.0f}.", "success")
+    return redirect(url_for("admin.teachers"))
 
 
 @admin_bp.route("/password-requests")
@@ -3392,8 +3408,11 @@ def teacher_payments():
         else:
             pay_date_raw = request.form.get("pay_date")
             pay_date = datetime.strptime(pay_date_raw, "%Y-%m-%d").date() if pay_date_raw else date.today()
+            hours = request.form.get("hours", type=float)
             db.session.add(TeacherPayment(
                 teacher_id=teacher.id, amount=amount, pay_date=pay_date,
+                hours=hours or None,
+                hourly_rate=teacher.hourly_rate if hours else None,
                 purpose=request.form.get("purpose", "").strip()[:200],
                 period=request.form.get("period", "").strip()[:40],
                 mode=request.form.get("mode", "Cash").strip()[:20] or "Cash",
@@ -3437,10 +3456,12 @@ def teacher_payments_excel():
     if teacher_id:
         query = query.filter_by(teacher_id=teacher_id)
     payments = query.order_by(TeacherPayment.pay_date.desc()).all()
-    headers = ["Date", "Teacher", "Amount", "Purpose", "Period", "Mode", "Paid By"]
-    rows = [[p.pay_date.strftime("%d-%m-%Y"), p.teacher.name, f"{p.amount:.0f}",
-             p.purpose or "", p.period or "", p.mode, p.paid_by or ""] for p in payments]
-    totals = ["", "Total", f"{sum(p.amount for p in payments):.0f}", "", "", "", ""]
+    headers = ["Date", "Teacher", "Hours", "Rate", "Amount", "Purpose", "Period", "Mode", "Paid By"]
+    rows = [[p.pay_date.strftime("%d-%m-%Y"), p.teacher.name,
+             f"{p.hours:g}" if p.hours else "", f"{p.hourly_rate:.0f}" if p.hourly_rate else "",
+             f"{p.amount:.0f}", p.purpose or "", p.period or "", p.mode, p.paid_by or ""]
+            for p in payments]
+    totals = ["", "Total", "", "", f"{sum(p.amount for p in payments):.0f}", "", "", "", ""]
     buffer = build_simple_sheet("Teacher Payments", headers, rows, totals)
     return send_file(buffer, as_attachment=True, download_name="teacher_payments.xlsx",
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

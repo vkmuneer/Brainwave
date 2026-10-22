@@ -1,5 +1,22 @@
 {% extends "base.html" %}
-{% block title %}Teacher Payments{% endblock %}
+{% block title %}Teacher Payments
+<script>
+  function calcPay() {
+    var sel = document.getElementById('payTeacher');
+    var hours = document.getElementById('payHours');
+    var amount = document.getElementById('payAmount');
+    var hint = document.getElementById('payRateHint');
+    if (!sel || !hours || !amount) return;
+    var rate = parseFloat(sel.options[sel.selectedIndex].getAttribute('data-rate')) || 0;
+    hint.textContent = rate ? ('Rate: Rs. ' + rate + ' per hour.') : 'No hourly rate set for this teacher.';
+    var h = parseFloat(hours.value);
+    if (rate > 0 && !isNaN(h) && h > 0) {
+      amount.value = Math.round(rate * h);
+    }
+  }
+  document.addEventListener('DOMContentLoaded', calcPay);
+</script>
+{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
   <h4 class="text-bw-teal m-0"><i class="bi bi-cash-stack"></i> Teacher Payments</h4>
@@ -14,16 +31,24 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="col-12 col-md-5">
         <label class="form-label small mb-0">Teacher *</label>
-        <select name="teacher_id" class="form-select" required>
-          <option value="">Choose...</option>
+        <select name="teacher_id" id="payTeacher" class="form-select" required onchange="calcPay()">
+          <option value="" data-rate="0">Choose...</option>
           {% for t in teachers %}
-          <option value="{{ t.id }}" {{ 'selected' if selected_teacher_id == t.id }}>{{ t.name }}</option>
+          <option value="{{ t.id }}" data-rate="{{ t.hourly_rate or 0 }}"
+                  {{ 'selected' if selected_teacher_id == t.id }}>{{ t.name }}{% if t.hourly_rate %} (Rs. {{ t.hourly_rate|int }}/hr){% endif %}</option>
           {% endfor %}
         </select>
       </div>
       <div class="col-6 col-md-3">
+        <label class="form-label small mb-0">Hours taken</label>
+        <input type="number" name="hours" id="payHours" class="form-control" step="0.5" min="0"
+               placeholder="e.g. 12" oninput="calcPay()">
+        <div class="form-text" id="payRateHint">Rate &times; hours fills the amount.</div>
+      </div>
+      <div class="col-6 col-md-3">
         <label class="form-label small mb-0">Amount (Rs.) *</label>
-        <input type="number" name="amount" class="form-control" step="1" min="1" required>
+        <input type="number" name="amount" id="payAmount" class="form-control" step="1" min="1" required>
+        <div class="form-text">You can edit this.</div>
       </div>
       <div class="col-6 col-md-4">
         <label class="form-label small mb-0">Date</label>
@@ -63,13 +88,16 @@
 <p class="fw-bold">Total shown: Rs. {{ "{:,.0f}".format(total) }}</p>
 <div class="table-responsive">
   <table class="table table-sm table-striped align-middle">
-    <thead><tr><th>Date</th><th>Teacher</th><th class="text-end">Amount</th><th>Purpose</th>
+    <thead><tr><th>Date</th><th>Teacher</th><th class="text-end">Hours</th><th class="text-end">Rate</th>
+      <th class="text-end">Amount</th><th>Purpose</th>
       <th>Period</th><th>Mode</th><th>Paid By</th><th></th></tr></thead>
     <tbody>
       {% for p in payments %}
       <tr>
         <td>{{ p.pay_date.strftime('%d-%m-%Y') }}</td>
         <td>{{ p.teacher.name }}</td>
+        <td class="text-end">{{ "{:g}".format(p.hours) if p.hours else '-' }}</td>
+        <td class="text-end">{{ "{:,.0f}".format(p.hourly_rate) if p.hourly_rate else '-' }}</td>
         <td class="text-end fw-bold">{{ "{:,.0f}".format(p.amount) }}</td>
         <td>{{ p.purpose or '' }}</td>
         <td>{{ p.period or '' }}</td>
@@ -86,7 +114,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="8" class="text-muted text-center">No payments recorded yet.</td></tr>
+      <tr><td colspan="10" class="text-muted text-center">No payments recorded yet.</td></tr>
       {% endfor %}
     </tbody>
   </table>

@@ -56,8 +56,22 @@ def test_teacher_cannot_reach_admin_pages(client, data):
 
 def test_office_cannot_reach_admin_only_pages(client, data):
     login(client, "office1", "Office@123")
-    for url in ["/admin/settings", "/admin/teachers", "/admin/classes", "/admin/audit-log"]:
+    for url in ["/admin/settings", "/admin/classes", "/admin/audit-log"]:
         assert client.get(url).status_code == 403, url
+
+
+def test_office_may_view_teachers_but_not_change_them(client, app, data):
+    """Office sets hourly rates, so it reads the teacher list - but adding,
+    editing and deactivating a teacher stay with the admin."""
+    from app.models import Teacher
+
+    login(client, "office1", "Office@123")
+    assert client.get("/admin/teachers").status_code == 200
+    with app.app_context():
+        tid = Teacher.query.first().id
+    assert client.get("/admin/teachers/new").status_code == 403
+    assert client.get(f"/admin/teachers/{tid}/edit").status_code == 403
+    assert client.post(f"/admin/teachers/{tid}/deactivate").status_code == 403
 
 
 def test_office_can_reach_its_own_work(client, data):

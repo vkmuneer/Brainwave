@@ -259,6 +259,10 @@ class Teacher(db.Model):
     # is what each month is measured against.
     monthly_salary = db.Column(db.Float, default=0, nullable=False)
 
+    # Hourly remuneration. The teacher payment screen multiplies it by the
+    # hours taken to suggest an amount, which stays editable.
+    hourly_rate = db.Column(db.Float, default=0, nullable=False)
+
     divisions = db.relationship("Division", secondary=teacher_divisions, backref="teachers")
     subjects = db.relationship("Subject", secondary=teacher_subjects, backref="teachers")
 
@@ -1117,6 +1121,10 @@ class TeacherPayment(db.Model):
     period = db.Column(db.String(40))            # optional month/label
     mode = db.Column(db.String(20), default="Cash", nullable=False)
     paid_by = db.Column(db.String(120))
+    # When paid by the hour: what was worked and the rate applied, kept on the
+    # record so a later rate change never rewrites history.
+    hours = db.Column(db.Float)
+    hourly_rate = db.Column(db.Float)
     academic_year_id = db.Column(db.Integer, db.ForeignKey("academic_years.id"), index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
