@@ -1,22 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Teacher Payments
-<script>
-  function calcPay() {
-    var sel = document.getElementById('payTeacher');
-    var hours = document.getElementById('payHours');
-    var amount = document.getElementById('payAmount');
-    var hint = document.getElementById('payRateHint');
-    if (!sel || !hours || !amount) return;
-    var rate = parseFloat(sel.options[sel.selectedIndex].getAttribute('data-rate')) || 0;
-    hint.textContent = rate ? ('Rate: Rs. ' + rate + ' per hour.') : 'No hourly rate set for this teacher.';
-    var h = parseFloat(hours.value);
-    if (rate > 0 && !isNaN(h) && h > 0) {
-      amount.value = Math.round(rate * h);
-    }
-  }
-  document.addEventListener('DOMContentLoaded', calcPay);
-</script>
-{% endblock %}
+{% block title %}Teacher Payments{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
   <h4 class="text-bw-teal m-0"><i class="bi bi-cash-stack"></i> Teacher Payments</h4>
@@ -119,4 +102,20 @@
     </tbody>
   </table>
 </div>
+<script>
+  function calcPay() {
+    var sel = document.getElementById('payTeacher');
+    var hours = document.getElementById('payHours');
+    var amount = document.getElementById('payAmount');
+    var hint = document.getElementById('payRateHint');
+    if (!sel || !hours || !amount) return;
+    var rate = parseFloat(sel.options[sel.selectedIndex].getAttribute('data-rate')) || 0;
+    hint.textContent = rate ? ('Rate: Rs. ' + rate + ' per hour.') : 'No hourly rate set for this teacher.';
+    var h = parseFloat(hours.value);
+    if (rate > 0 && !isNaN(h) && h > 0) {
+      amount.value = Math.round(rate * h);
+    }
+  }
+  document.addEventListener('DOMContentLoaded', calcPay);
+</script>
 {% endblock %}

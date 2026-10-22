@@ -88,3 +88,28 @@ def test_teacher_cannot_set_rates(client, app, data):
     tid = _tid(app)
     login(client, "teach1", "Teach@123")
     assert client.post(f"/admin/teachers/{tid}/hourly-rate", data={"hourly_rate": "999"}).status_code == 403
+
+
+def test_calculator_script_is_in_the_body_not_the_title(client, app, data):
+    """The hours-to-amount script must render in the page body.
+
+    It was once injected into {% block title %}, so it sat inside <title> and
+    never ran - the amount silently stopped auto-filling.
+    """
+    tid = _tid(app)
+    login(client, "admin", "admin123")
+    client.post(f"/admin/teachers/{tid}/hourly-rate", data={"hourly_rate": "400"}, follow_redirects=True)
+
+    html = client.get("/admin/teacher-payments").get_data(as_text=True)
+    head, _, body = html.partition("</head>")
+    assert "calcPay" not in head, "the calculator script leaked into <head>/<title>"
+    assert "calcPay" in body
+    assert 'id="payHours"' in body and 'id="payAmount"' in body
+
+
+def test_teacher_rate_reaches_the_page_for_the_calculator(client, app, data):
+    tid = _tid(app)
+    login(client, "admin", "admin123")
+    client.post(f"/admin/teachers/{tid}/hourly-rate", data={"hourly_rate": "450"}, follow_redirects=True)
+    body = client.get("/admin/teacher-payments").get_data(as_text=True)
+    assert 'data-rate="450' in body, "the hourly rate must be on the option for the calculator"
