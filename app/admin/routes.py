@@ -217,14 +217,12 @@ def search():
 
 
 # ----------------------------------------------------------------- students
-@admin_bp.route("/students")
-@login_required
-@office_required
-def students():
-    class_id = request.args.get("class_id", type=int)
-    division_id = request.args.get("division_id", type=int)
-    q = request.args.get("q", "").strip()
-    status = request.args.get("status", "")
+def _compute_student_list(args):
+    """The filtered student list shared by the page and its downloads."""
+    class_id = args.get("class_id", type=int)
+    division_id = args.get("division_id", type=int)
+    q = args.get("q", "").strip()
+    status = args.get("status", "")
 
     query = limit_students(Student.query.filter_by(active=True))
     if class_id:
@@ -243,9 +241,9 @@ def students():
 
     # Optional: narrow by how a student did in one exam - e.g. everyone under
     # 35% in the Mid Term, to plan extra sessions.
-    exam_id = request.args.get("exam_id", type=int)
-    min_pct = request.args.get("min_pct", type=float)
-    max_pct = request.args.get("max_pct", type=float)
+    exam_id = args.get("exam_id", type=int)
+    min_pct = args.get("min_pct", type=float)
+    max_pct = args.get("max_pct", type=float)
     scores = {}
     exam = None
 
@@ -281,20 +279,93 @@ def students():
     if visible_ids is not None:
         exam_options = [e for e in exam_options if e.class_id in visible_ids]
 
-    return render_template(
-        "admin/students.html",
-        students=student_list,
-        classes=_classes_sorted(),
-        selected_class_id=class_id,
-        selected_division_id=division_id,
-        q=q,
-        status=status,
-        exam_options=exam_options,
-        exam=exam,
-        exam_id=exam_id,
-        min_pct=min_pct,
-        max_pct=max_pct,
-        scores=scores,
+    return {
+        "students": student_list,
+        "classes": _classes_sorted(),
+        "selected_class_id": class_id,
+        "selected_division_id": division_id,
+        "q": q,
+        "status": status,
+        "exam_options": exam_options,
+        "exam": exam,
+        "exam_id": exam_id,
+        "min_pct": min_pct,
+        "max_pct": max_pct,
+        "scores": scores,
+    }
+
+
+def _student_list_label(data):
+    """A human description of the current filter, for the report header."""
+    bits = []
+    for c in data["classes"]:
+        if c.id == data["selected_class_id"]:
+            bits.append(f"Class {c.name}")
+            for d in c.divisions:
+                if d.id == data["selected_division_id"]:
+                    bits[-1] += f"-{d.name}"
+    if not bits:
+        bits.append("All classes")
+    if data["status"] == "pending":
+        bits.append("pending fees")
+    elif data["status"] == "paid":
+        bits.append("fully paid")
+    if data["q"]:
+        bits.append(f'search "{data["q"]}"')
+    return " \u00b7 ".join(bits)
+
+
+@admin_bp.route("/students")
+@login_required
+@office_required
+def students():
+    return render_template("admin/students.html", **_compute_student_list(request.args))
+
+
+@admin_bp.route("/students/excel")
+@login_required
+@office_required
+def students_excel():
+    data = _compute_student_list(request.args)
+    headers = ["Sl No", "Admission No", "Name", "Class", "Division", "Parent Name",
+               "Parent WhatsApp", "Place", "School", "Admission Date",
+               "Total Fee", "Discount", "Paid", "Pending"]
+    rows = []
+    for i, st in enumerate(data["students"], start=1):
+        rows.append([
+            i, st.admission_no, st.name, st.school_class.name, st.division.name,
+            st.parent_name or "", st.parent_whatsapp or "", st.place or "",
+            st.school_name or "",
+            st.admission_date.strftime("%d-%m-%Y") if st.admission_date else "",
+            f"{st.total_fee:.0f}", f"{st.discount_amount or 0:.0f}",
+            f"{st.total_paid:.0f}", f"{st.pending_fee:.0f}",
+        ])
+    totals = ["", "", "Total", "", "", "", "", "", "", "",
+              f"{sum(s.total_fee for s in data['students']):.0f}", "",
+              f"{sum(s.total_paid for s in data['students']):.0f}",
+              f"{sum(s.pending_fee for s in data['students']):.0f}"]
+    buffer = build_simple_sheet("Students", headers, rows, totals)
+    return send_file(buffer, as_attachment=True, download_name="students.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+@admin_bp.route("/students/pdf")
+@login_required
+@office_required
+def students_pdf():
+    data = _compute_student_list(request.args)
+    columns = ["Sl", "Adm No", "Name", "Class-Div", "Parent", "WhatsApp", "Pending"]
+    rows = [[i, st.admission_no, st.name,
+             f"{st.school_class.name}-{st.division.name}",
+             st.parent_name or "-", st.parent_whatsapp or "-",
+             f"Rs. {st.pending_fee:,.0f}"]
+            for i, st in enumerate(data["students"], start=1)]
+    return _pdf_response(
+        "pdf/generic_report_pdf.html", "students.pdf",
+        title="Student List", meta=_student_list_label(data),
+        columns=columns, rows=rows,
+        summary_lines=[("Students listed", str(len(data["students"]))),
+                       ("Total pending", f"Rs. {sum(s.pending_fee for s in data['students']):,.0f}")],
     )
 
 
@@ -385,6 +456,46 @@ def student_deactivate(student_id):
     db.session.commit()
     flash(f"{student.name} has been deactivated.", "info")
     return redirect(url_for("admin.students"))
+
+
+@admin_bp.route("/students/<int:student_id>/delete", methods=["GET", "POST"])
+@login_required
+@admin_required
+def student_delete(student_id):
+    """Permanently remove a student and everything attached to them.
+
+    This destroys their fee payments, so it is admin-only and asks for the
+    admission number to be typed back. Deactivating is offered alongside and is
+    what the office should normally use - it hides the student from the lists
+    while keeping the money history intact.
+    """
+    student = ensure_student_visible(Student.query.get_or_404(student_id))
+    impact = {
+        "payments": len(student.payments),
+        "paid": sum(p.amount for p in student.payments),
+        "attendance": Attendance.query.filter_by(student_id=student.id).count(),
+        "marks": ExamMark.query.filter_by(student_id=student.id).count(),
+        "messages": MessageLog.query.filter_by(student_id=student.id).count(),
+        "feedback": Feedback.query.filter_by(student_id=student.id).count(),
+    }
+
+    if request.method == "POST":
+        if request.form.get("confirm", "").strip() != student.admission_no:
+            flash("Type the admission number exactly as shown to confirm.", "danger")
+            return redirect(url_for("admin.student_delete", student_id=student.id))
+
+        name, adm = student.name, student.admission_no
+        # These reference the student without a cascade, so clear them first or
+        # the delete fails on a foreign key.
+        ExamMark.query.filter_by(student_id=student.id).delete(synchronize_session=False)
+        MessageLog.query.filter_by(student_id=student.id).delete(synchronize_session=False)
+        Feedback.query.filter_by(student_id=student.id).delete(synchronize_session=False)
+        db.session.delete(student)   # payments and attendance cascade
+        db.session.commit()
+        flash(f"{name} ({adm}) and all their records have been permanently deleted.", "warning")
+        return redirect(url_for("admin.students"))
+
+    return render_template("admin/student_delete.html", student=student, impact=impact)
 
 
 # ------------------------------------------------------------ fee payments

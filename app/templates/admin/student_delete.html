@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Delete {{ student.name }}{% endblock %}
+{% block content %}
+<div class="card bw-card" style="max-width: 620px;">
+  <div class="card-body p-4">
+    <h5 class="text-danger mb-3"><i class="bi bi-exclamation-triangle"></i> Permanently delete a student</h5>
+
+    <p>You are about to delete <b>{{ student.name }}</b> ({{ student.admission_no }}),
+       {{ student.school_class.name }}-{{ student.division.name }}.</p>
+
+    <div class="alert alert-danger">
+      <b>This cannot be undone.</b> These records will be destroyed with them:
+      <ul class="mb-0 mt-2">
+        <li><b>{{ impact.payments }}</b> fee payment{{ '' if impact.payments == 1 else 's' }}
+            totalling <b>Rs. {{ "{:,.0f}".format(impact.paid) }}</b></li>
+        <li><b>{{ impact.attendance }}</b> attendance record{{ '' if impact.attendance == 1 else 's' }}</li>
+        <li><b>{{ impact.marks }}</b> exam mark{{ '' if impact.marks == 1 else 's' }}</li>
+        <li><b>{{ impact.messages }}</b> message log{{ '' if impact.messages == 1 else 's' }}
+            and <b>{{ impact.feedback }}</b> feedback item{{ '' if impact.feedback == 1 else 's' }}</li>
+      </ul>
+    </div>
+
+    {% if impact.payments %}
+    <p class="text-muted small">
+      Those payments will disappear from your fee collection and accounts totals for every
+      period they fall in. If this student really was here, <b>deactivate</b> them instead -
+      it takes them off the lists but keeps the money history.
+    </p>
+    {% endif %}
+
+    <form method="post" class="mb-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="form-label">To confirm, type the admission number <code>{{ student.admission_no }}</code></label>
+      <input type="text" name="confirm" class="form-control mb-3" autocomplete="off" required
+             placeholder="{{ student.admission_no }}">
+      <button type="submit" class="btn btn-danger">
+        <i class="bi bi-trash"></i> Delete permanently
+      </button>
+      <a href="{{ url_for('admin.students') }}" class="btn btn-outline-secondary">Cancel</a>
+    </form>
+
+    <hr>
+    <form method="post" action="{{ url_for('admin.student_deactivate', student_id=student.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-eye-slash"></i> Deactivate instead (keeps all records)
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

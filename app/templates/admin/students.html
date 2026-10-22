@@ -6,6 +6,8 @@
   <h4 class="text-bw-teal m-0">Students</h4>
   <div class="d-flex gap-2">
     <a href="{{ url_for('admin.students_bulk_upload') }}" class="btn btn-outline-secondary"><i class="bi bi-file-earmark-excel"></i> Bulk Upload</a>
+    <a href="{{ url_for('admin.students_excel', **request.args) }}" class="btn btn-outline-secondary"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+    <a href="{{ url_for('admin.students_pdf', **request.args) }}" class="btn btn-outline-secondary"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
     <a href="{{ url_for('admin.student_form') }}" class="btn btn-bw-primary"><i class="bi bi-plus-lg"></i> Add Student</a>
   </div>
 </div>
@@ -125,6 +127,10 @@
           <td>
             <a href="{{ url_for('admin.student_detail', student_id=s.id) }}" class="btn btn-sm btn-outline-secondary">View</a>
             <a href="{{ url_for('admin.student_form', student_id=s.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
+            {% if current_user.is_admin %}
+            <a href="{{ url_for('admin.student_delete', student_id=s.id) }}"
+               class="btn btn-sm btn-outline-danger" title="Delete {{ s.name }}"><i class="bi bi-trash"></i></a>
+            {% endif %}
           </td>
         </tr>
         {% else %}
